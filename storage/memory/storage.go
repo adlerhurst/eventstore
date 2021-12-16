@@ -42,6 +42,7 @@ func (s *Storage) Push(_ context.Context, cmds []eventstore.Command) (events []*
 func (s *Storage) Filter(_ context.Context, filter eventstore.Filter) ([]*eventstore.Event, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	//needed because in the current implementation the base subject has no subject
 	filter.Subjects = append([]eventstore.Subject{eventstore.SingleToken}, filter.Subjects...)
 	return s.base.find(filter.Subjects), nil
 }

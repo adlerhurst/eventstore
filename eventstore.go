@@ -8,10 +8,10 @@ import (
 //Eventstore abstracts all functions needed to store valid events
 // and filters the stored events
 type Eventstore struct {
-	storage store
+	storage Storage
 }
 
-func New(s store) *Eventstore {
+func New(s Storage) *Eventstore {
 	return &Eventstore{
 		storage: s,
 	}
@@ -58,14 +58,14 @@ var (
 	ErrInvalidCommand = errors.New("invalid command")
 )
 
-type store interface {
+type Storage interface {
 	//Health checks if the storage is available
 	Ready(context.Context) error
 	//Push stores the command's and returns the resulting Event's
 	// the command's should be stored in a single transaction
-	Push(context.Context, []Command) ([]*Event, error)
+	Push(context.Context, []Command) ([]Event, error)
 	//Filter returns the events matching the subject
-	Filter(context.Context, Filter) ([]*Event, error)
+	Filter(context.Context, Filter) ([]Event, error)
 }
 
 //Ready checks if the eventstore can properly work
@@ -76,21 +76,21 @@ func (es *Eventstore) Ready(ctx context.Context) error {
 
 //PushEvents pushes the events in a single transaction
 // an event needs at least an aggregate
-func (es *Eventstore) Push(ctx context.Context, commands ...Command) ([]*Event, error) {
+func (es *Eventstore) Push(ctx context.Context, commands ...Command) ([]Event, error) {
 	return es.storage.Push(ctx, commands)
 }
 
 type Filter struct {
 	//From represents the lowest sequence
-	//TODO; From uint64
+	From uint64
 	//To represents the highest sequence
-	//TODO; To uint64
+	To uint64
 	//Limit represents the maximum events returned
-	//TODO; Limit uint64
+	Limit uint64
 	//Subjects represent the subjects to look
 	Subjects []Subject
 }
 
-func (es *Eventstore) Filter(ctx context.Context, f Filter) ([]*Event, error) {
+func (es *Eventstore) Filter(ctx context.Context, f Filter) ([]Event, error) {
 	return es.storage.Filter(ctx, f)
 }

@@ -22,27 +22,57 @@ func New() *Storage {
 //Health checks if the storage is available
 func (s *Storage) Ready(context.Context) error { return nil }
 
-//Push stores the command's and returns the resulting Event's
+// Push stores the command's and returns the resulting Event's
 // the command's should be stored in a single transaction
-func (s *Storage) Push(_ context.Context, cmds []eventstore.Command) (events []*eventstore.Event, err error) {
+func (s *Storage) Push(_ context.Context, cmds []eventstore.Command) (storedEvents []eventstore.Event, err error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	events = make([]*eventstore.Event, len(cmds))
-
+	toPush := make(events, len(cmds))
+	storedEvents = make([]eventstore.Event, len(cmds))
+	seq := s.sequence
 	for i, cmd := range cmds {
-		s.sequence += 1
-		events[i], err = s.base.push(cmd.Subjects(), cmd, s.sequence)
+		seq++
+		toPush[i], err = NewEvent(cmd, seq)
+		if err != nil {
+			return nil, err
+		}
+		storedEvents[i] = toPush[i].toEventstore()
 	}
 
-	return events, nil
+	for _, e := range toPush {
+		s.base.push(e.Subjects, e)
+	}
+
+	s.sequence = seq
+	return storedEvents, nil
 }
 
 //Filter returns the events matching the subject
-func (s *Storage) Filter(_ context.Context, filter eventstore.Filter) ([]*eventstore.Event, error) {
+func (s *Storage) Filter(_ context.Context, filter eventstore.Filter) (res []eventstore.Event, _ error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	//needed because in the current implementation the base subject has no subject
 	filter.Subjects = append([]eventstore.Subject{eventstore.SingleToken}, filter.Subjects...)
-	return s.base.find(filter.Subjects), nil
+
+	res = make([]eventstore.Event, 0, filter.Limit)
+
+	found := s.base.find(filter.Subjects)
+	for _, e := range found {
+
+		if filter.From > 0 && e.Sequence < filter.From {
+			continue
+		}
+		if filter.To > 0 && e.Sequence > filter.To {
+			break
+		}
+
+		res = append(res, e.toEventstore())
+
+		if uint64(len(res)) == filter.Limit {
+			break
+		}
+	}
+
+	return res, nil
 }

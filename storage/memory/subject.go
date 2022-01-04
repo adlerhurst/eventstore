@@ -1,74 +1,68 @@
 package memory
 
 import (
+	"sort"
+
 	"github.com/adlerhurst/eventstore"
-	"github.com/adlerhurst/eventstore/storage"
 )
 
 type subject struct {
 	topic  eventstore.TextSubject
-	events []*eventstore.Event
+	events events
 	subs   []*subject
 }
 
-func (n *subject) push(subjects []eventstore.TextSubject, cmd eventstore.Command, seq uint64) (*eventstore.Event, error) {
+func (s *subject) push(subjects []eventstore.TextSubject, e *event) {
 	if len(subjects) == 0 {
-		payload, err := storage.PayloadToBytes(cmd.Payload())
-		if err != nil {
-			return nil, err
-		}
-		e := &eventstore.Event{
-			EditorService: cmd.EditorService(),
-			EditorUser:    cmd.EditorService(),
-			Subjects:      cmd.Subjects(),
-			Payload:       payload,
-			Sequence:      seq,
-			ResourceOwner: cmd.ResourceOwner(),
-		}
-		n.events = append(n.events, e)
-		return e, nil
+		s.events = append(s.events, e)
+		return
 	}
-	for _, sub := range n.subs {
+	for _, sub := range s.subs {
 		if sub.topic == subjects[0] {
-			return sub.push(subjects[1:], cmd, seq)
+			sub.push(subjects[1:], e)
+			return
 		}
 	}
 
 	sub := &subject{topic: subjects[0]}
-	n.subs = append(n.subs, sub)
+	s.subs = append(s.subs, sub)
 
-	return sub.push(subjects[1:], cmd, seq)
+	sub.push(subjects[1:], e)
 }
 
-func (n *subject) find(subjects []eventstore.Subject) (events []*eventstore.Event) {
+func (s *subject) find(subjects []eventstore.Subject) (res events) {
 	if len(subjects) == 0 {
 		return nil
 	}
-	if s, ok := subjects[0].(eventstore.TextSubject); ok {
-		if n.topic != s {
+
+	defer sort.Sort(res)
+
+	if sub, ok := subjects[0].(eventstore.TextSubject); ok {
+		if s.topic != sub {
 			return nil
 		} else if len(subjects) == 1 {
-			return n.events
+			return s.events
 		} else {
-			for _, sub := range n.subs {
-				events = append(events, sub.find(subjects[1:])...)
+			for _, sub := range s.subs {
+				res = append(res, sub.find(subjects[1:])...)
 			}
-			return events
+			return res
 		}
 	} else if subjects[0] == eventstore.MultiToken {
-		return n.getAll()
+		res = s.getAll()
+		return res
 	} else if subjects[0] == eventstore.SingleToken {
-		for _, sub := range n.subs {
-			events = append(events, sub.find(subjects[1:])...)
+		for _, sub := range s.subs {
+			res = append(res, sub.find(subjects[1:])...)
 		}
 	}
-	return events
+	return res
 }
 
-func (n *subject) getAll() (events []*eventstore.Event) {
-	events = n.events
+func (n *subject) getAll() (res events) {
+	res = n.events
 	for _, sub := range n.subs {
-		events = append(events, sub.getAll()...)
+		res = append(res, sub.getAll()...)
 	}
-	return events
+	return res
 }

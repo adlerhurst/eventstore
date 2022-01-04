@@ -13,3 +13,28 @@ The current development relatest to the [subject based messaging pattern](https:
 I love eventsourcing. It helps me a lot durring engineering processes because it is crystal clear that everything I decide now won't change. I can change the future but i can't change the past. Happily, thanks to GDPR the internet has to forget my data. With this fact in mind as an application developer it must be possible to manipulate or forget the past without loss of an activity stream.
 
 It makes development hard because you have to think of what you do before you start doing it, a definition of an event can evolve durring time but you're not able to enrich information to an event after it happened.
+
+## Ideas
+
+Some ideas which probably will be implemented. The list is unordered and some points might never be implemented.
+
+- [ ] allow multiple filters in eventstore.Filter
+  - [ ] storage: provide an Optimize method to simpify queries
+- [ ] additional storage types
+  - [ ] sql (crdb) storage
+  - [ ] file storage
+- [ ] memory: optimize tree
+  - [ ] self balanced
+  - [ ] check out different tree styles
+- [ ] testing suite
+- [ ] fuzzy testing with go1.18
+- [ ] Think of an option to register event types to return the concrete type instead of the `Event`-struct (Event would change to interface)
+- [ ] Subscriber: add the possibility to listen to message queues
+  - [ ] Pub/Sub (NATS, ...)
+  - [ ] (Web-)hook
+- [ ] Publisher: add the possibility to push events
+  - [ ] Third party tools (NATS, ...)
+  - [ ] Specifications (MQTT, ...)
+  - [ ] No dependencies
+    - [ ] Webhooks
+    - [ ] GRPC streams

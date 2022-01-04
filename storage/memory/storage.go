@@ -10,12 +10,12 @@ import (
 type Storage struct {
 	sequence uint64
 	mu       sync.Mutex
-	base     *subject
+	root     *subject
 }
 
 func New() *Storage {
 	return &Storage{
-		base: &subject{},
+		root: &subject{},
 	}
 }
 
@@ -41,7 +41,7 @@ func (s *Storage) Push(_ context.Context, cmds []eventstore.Command) (storedEven
 	}
 
 	for _, e := range toPush {
-		s.base.push(e.Subjects, e)
+		s.root.push(e.Subjects, e)
 	}
 
 	s.sequence = seq
@@ -57,7 +57,7 @@ func (s *Storage) Filter(_ context.Context, filter eventstore.Filter) (res []eve
 
 	res = make([]eventstore.Event, 0, filter.Limit)
 
-	found := s.base.find(filter.Subjects)
+	found := s.root.find(filter.Subjects)
 	for _, e := range found {
 
 		if filter.From > 0 && e.Sequence < filter.From {

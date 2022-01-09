@@ -9,11 +9,13 @@ import (
 // and filters the stored events
 type Eventstore struct {
 	storage Storage
+	types   []*typ
 }
 
 func New(s Storage) *Eventstore {
 	return &Eventstore{
 		storage: s,
+		types:   []*typ{},
 	}
 }
 
@@ -36,22 +38,32 @@ type Command interface {
 	Payload() interface{}
 }
 
-//Event represents a change
-type Event struct {
+//Event is the abstraction if a user wants to get events mapped by the eventstore
+type Event interface {
+	Base() EventBase
+}
+
+//EventBase represents a change
+type EventBase struct {
 	//EditorService is the service which pushed the event
-	EditorService string
+	EditorService string `json:"-"`
 	//EditorUser is the user which pushed the event
-	EditorUser string
+	EditorUser string `json:"-"`
 	//ResourceOwner is the owner of the event
-	ResourceOwner string
+	ResourceOwner string `json:"-"`
 	//Payload represents the data as json
-	Payload []byte
+	Payload []byte `json:"-"`
 
 	//Subject represent the object the event belongs to
 	//e.g. add user A event: {"users", "A", "added"}
-	Subjects []TextSubject
+	Subjects []TextSubject `json:"-"`
 
-	Sequence uint64
+	//Sequence an eventstore wide unique upcounting identifier of the event
+	Sequence uint64 `json:"-"`
+}
+
+func (e EventBase) Base() EventBase {
+	return e
 }
 
 var (
@@ -63,9 +75,9 @@ type Storage interface {
 	Ready(context.Context) error
 	//Push stores the command's and returns the resulting Event's
 	// the command's should be stored in a single transaction
-	Push(context.Context, []Command) ([]Event, error)
+	Push(context.Context, []Command) ([]EventBase, error)
 	//Filter returns the events matching the subject
-	Filter(context.Context, Filter) ([]Event, error)
+	Filter(context.Context, Filter) ([]EventBase, error)
 }
 
 //Ready checks if the eventstore can properly work
@@ -77,9 +89,20 @@ func (es *Eventstore) Ready(ctx context.Context) error {
 //PushEvents pushes the events in a single transaction
 // an event needs at least an aggregate
 func (es *Eventstore) Push(ctx context.Context, commands ...Command) ([]Event, error) {
-	return es.storage.Push(ctx, commands)
+	res, err := es.storage.Push(ctx, commands)
+	if err != nil {
+		return nil, err
+	}
+
+	events := make([]Event, len(res))
+	for i, event := range res {
+		events[i] = es.MapEvent(event)
+	}
+
+	return events, nil
 }
 
+//Filter represents a query
 type Filter struct {
 	//From represents the lowest sequence
 	From uint64
@@ -91,6 +114,16 @@ type Filter struct {
 	Subjects []Subject
 }
 
+//Filter searches events in the storage by the given `Filter
 func (es *Eventstore) Filter(ctx context.Context, f Filter) ([]Event, error) {
-	return es.storage.Filter(ctx, f)
+	res, err := es.storage.Filter(ctx, f)
+	if err != nil {
+		return nil, err
+	}
+	events := make([]Event, len(res))
+	for i, event := range res {
+		events[i] = es.MapEvent(event)
+	}
+
+	return events, nil
 }

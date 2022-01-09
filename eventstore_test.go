@@ -35,6 +35,8 @@ func (u testUser) toAdded() *testUserAdded {
 }
 
 type testUserAdded struct {
+	eventstore.EventBase `json:"-"`
+
 	id        string
 	FirstName string `json:"firstName,omitempty"`
 	LastName  string `json:"lastName,omitempty"`
@@ -61,6 +63,8 @@ func (u testUser) toFirstNameChanged() *testUserFirstNameChanged {
 }
 
 type testUserFirstNameChanged struct {
+	eventstore.EventBase `json:"-"`
+
 	id        string
 	FirstName string `json:"firstName,omitempty"`
 }
@@ -85,6 +89,8 @@ func (u testUser) toLastNameChanged() *testUserLastNameChanged {
 }
 
 type testUserLastNameChanged struct {
+	eventstore.EventBase `json:"-"`
+
 	id       string
 	LastName string `json:"lastName,omitempty"`
 }
@@ -109,6 +115,8 @@ func (u testUser) toUsernameChanged() *testUsernameChanged {
 }
 
 type testUsernameChanged struct {
+	eventstore.EventBase `json:"-"`
+
 	id       string
 	Username string `json:"username,omitempty"`
 }
@@ -132,6 +140,8 @@ func (u testUser) toRemoved() *testUserRemoved {
 }
 
 type testUserRemoved struct {
+	eventstore.EventBase `json:"-"`
+
 	id string
 }
 
@@ -158,7 +168,7 @@ func TestEventstore_Push(t *testing.T) {
 		name    string
 		fields  fields
 		args    args
-		want    []eventstore.Event
+		want    []eventstore.EventBase
 		wantErr bool
 	}{
 		{
@@ -172,7 +182,7 @@ func TestEventstore_Push(t *testing.T) {
 					defaultTestUser.toRemoved(),
 				},
 			},
-			want: []eventstore.Event{
+			want: []eventstore.EventBase{
 				{
 					EditorService: "svc",
 					EditorUser:    "usr",
@@ -250,7 +260,7 @@ func TestEventstore_Filter(t *testing.T) {
 		name    string
 		fields  fields
 		args    args
-		want    []eventstore.Event
+		want    []eventstore.EventBase
 		wantErr bool
 	}{
 		{
@@ -263,7 +273,7 @@ func TestEventstore_Filter(t *testing.T) {
 					Subjects: []eventstore.Subject{eventstore.TextSubject("user"), eventstore.TextSubject("id"), eventstore.MultiToken},
 				},
 			},
-			want: []eventstore.Event{
+			want: []eventstore.EventBase{
 				{
 					EditorService: "svc",
 					EditorUser:    "usr",

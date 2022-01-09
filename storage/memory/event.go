@@ -10,7 +10,7 @@ type events []*event
 // event implements a linked list
 // the aim is to iterate throug events based on the sequence
 type event struct {
-	eventstore.Event
+	eventstore.EventBase
 }
 
 func NewEvent(cmd eventstore.Command, seq uint64) (*event, error) {
@@ -19,7 +19,7 @@ func NewEvent(cmd eventstore.Command, seq uint64) (*event, error) {
 		return nil, err
 	}
 	return &event{
-		Event: eventstore.Event{
+		EventBase: eventstore.EventBase{
 			EditorService: cmd.EditorService(),
 			EditorUser:    cmd.EditorUser(),
 			Subjects:      cmd.Subjects(),
@@ -30,8 +30,8 @@ func NewEvent(cmd eventstore.Command, seq uint64) (*event, error) {
 	}, nil
 }
 
-func (e *event) toEventstore() eventstore.Event {
-	return eventstore.Event{
+func (e *event) toEventstore() eventstore.EventBase {
+	return eventstore.EventBase{
 		EditorService: e.EditorService,
 		EditorUser:    e.EditorUser,
 		ResourceOwner: e.ResourceOwner,

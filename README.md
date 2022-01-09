@@ -20,6 +20,7 @@ Some ideas which probably will be implemented. The list is unordered and some po
 
 - [ ] allow multiple filters in eventstore.Filter
   - [ ] storage: provide an Optimize method to simpify queries
+  - [ ] maybe two layers of optimizations would be more useful. First in eventstore to collect filters and one in storage optimized on it's internal data structures.
 - [ ] additional storage types
   - [ ] sql (crdb) storage
   - [ ] file storage
@@ -28,7 +29,7 @@ Some ideas which probably will be implemented. The list is unordered and some po
   - [ ] check out different tree styles
 - [ ] testing suite
 - [ ] fuzzy testing with go1.18
-- [ ] Think of an option to register event types to return the concrete type instead of the `Event`-struct (Event would change to interface)
+- [x] Think of an option to register event types to return the concrete type instead of the `Event`-struct (Event would change to interface)
 - [ ] Subscriber: add the possibility to listen to message queues
   - [ ] Pub/Sub (NATS, ...)
   - [ ] (Web-)hook

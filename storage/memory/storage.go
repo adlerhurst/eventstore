@@ -24,12 +24,12 @@ func (s *Storage) Ready(context.Context) error { return nil }
 
 // Push stores the command's and returns the resulting Event's
 // the command's should be stored in a single transaction
-func (s *Storage) Push(_ context.Context, cmds []eventstore.Command) (storedEvents []eventstore.Event, err error) {
+func (s *Storage) Push(_ context.Context, cmds []eventstore.Command) (storedEvents []eventstore.EventBase, err error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	toPush := make(events, len(cmds))
-	storedEvents = make([]eventstore.Event, len(cmds))
+	storedEvents = make([]eventstore.EventBase, len(cmds))
 	seq := s.sequence
 	for i, cmd := range cmds {
 		seq++
@@ -49,13 +49,13 @@ func (s *Storage) Push(_ context.Context, cmds []eventstore.Command) (storedEven
 }
 
 //Filter returns the events matching the subject
-func (s *Storage) Filter(_ context.Context, filter eventstore.Filter) (res []eventstore.Event, _ error) {
+func (s *Storage) Filter(_ context.Context, filter eventstore.Filter) (res []eventstore.EventBase, _ error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	//needed because in the current implementation the base subject has no subject
 	filter.Subjects = append([]eventstore.Subject{eventstore.SingleToken}, filter.Subjects...)
 
-	res = make([]eventstore.Event, 0, filter.Limit)
+	res = make([]eventstore.EventBase, 0, filter.Limit)
 
 	found := s.root.find(filter.Subjects)
 	for _, e := range found {

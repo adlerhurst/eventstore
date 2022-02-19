@@ -9,14 +9,21 @@ import (
 // and filters the stored events
 type Eventstore struct {
 	storage Storage
+	m       *Mapping
 	types   []*typ
 }
 
-func New(s Storage) *Eventstore {
-	return &Eventstore{
+func New(s Storage, opts ...Option) *Eventstore {
+	e := &Eventstore{
 		storage: s,
 		types:   []*typ{},
 	}
+
+	for _, opt := range opts {
+		opt(e)
+	}
+
+	return e
 }
 
 //Command represents a change to be made
@@ -78,6 +85,11 @@ type Storage interface {
 	Push(context.Context, []Command) ([]EventBase, error)
 	//Filter returns the events matching the subject
 	Filter(context.Context, Filter) ([]EventBase, error)
+}
+
+type Pubsub interface {
+	Subscribe()
+	Publish(...Event)
 }
 
 //Ready checks if the eventstore can properly work

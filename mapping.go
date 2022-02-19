@@ -102,3 +102,54 @@ func mapping(sub Subject) func(Subject) bool {
 	log.Fatal("sub not implemented")
 	return nil
 }
+
+type Mapping struct {
+	s     Subject
+	f     []func(...Event)
+	nodes []*Mapping
+}
+
+func Register(m *Mapping, subs []Subject, f func(...Event)) {
+	if len(subs) == 0 {
+		m.f = append(m.f, f)
+	}
+
+	for _, node := range m.nodes {
+		if node.Is(subs[0]) {
+			Register(node, subs[1:], f)
+			return
+		}
+	}
+	node := &Mapping{
+		s: subs[0],
+	}
+	m.nodes = append(m.nodes, node)
+	Register(node, subs[1:], f)
+}
+
+func (m *Mapping) Is(sub Subject) bool {
+	return m.s == sub
+}
+
+func (m *Mapping) postPush(event Event, subIdx int) {
+	if event.Base().Subjects[subIdx] != m.s {
+		return
+	}
+	if len(event.Base().Subjects) == subIdx+1 {
+		for _, f := range m.f {
+			f(event)
+		}
+	}
+}
+
+func (m *Mapping) shouldExec(subs []Subject) bool {
+
+	return false
+}
+
+// orgs.01.users.20.grants.300.roles.admin.added
+// orgs.>
+//
+// user.id.added
+// user.>
+// user.*.added

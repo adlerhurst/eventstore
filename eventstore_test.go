@@ -35,7 +35,7 @@ func (u testUser) toAdded() *testUserAdded {
 }
 
 type testUserAdded struct {
-	eventstore.EventBase `json:"-"`
+	eventstore.Event `json:"-"`
 
 	id        string
 	FirstName string `json:"firstName,omitempty"`
@@ -63,7 +63,7 @@ func (u testUser) toFirstNameChanged() *testUserFirstNameChanged {
 }
 
 type testUserFirstNameChanged struct {
-	eventstore.EventBase `json:"-"`
+	eventstore.Event `json:"-"`
 
 	id        string
 	FirstName string `json:"firstName,omitempty"`
@@ -89,7 +89,7 @@ func (u testUser) toLastNameChanged() *testUserLastNameChanged {
 }
 
 type testUserLastNameChanged struct {
-	eventstore.EventBase `json:"-"`
+	eventstore.Event `json:"-"`
 
 	id       string
 	LastName string `json:"lastName,omitempty"`
@@ -115,7 +115,7 @@ func (u testUser) toUsernameChanged() *testUsernameChanged {
 }
 
 type testUsernameChanged struct {
-	eventstore.EventBase `json:"-"`
+	eventstore.Event `json:"-"`
 
 	id       string
 	Username string `json:"username,omitempty"`
@@ -140,7 +140,7 @@ func (u testUser) toRemoved() *testUserRemoved {
 }
 
 type testUserRemoved struct {
-	eventstore.EventBase `json:"-"`
+	eventstore.Event `json:"-"`
 
 	id string
 }
@@ -168,7 +168,7 @@ func TestEventstore_Push(t *testing.T) {
 		name    string
 		fields  fields
 		args    args
-		want    []eventstore.EventBase
+		want    []eventstore.Event
 		wantErr bool
 	}{
 		{
@@ -182,21 +182,21 @@ func TestEventstore_Push(t *testing.T) {
 					defaultTestUser.toRemoved(),
 				},
 			},
-			want: []eventstore.EventBase{
+			want: []eventstore.Event{
 				{
 					EditorService: "svc",
 					EditorUser:    "usr",
-					ResourceOwner: "ro",
-					Subjects:      []eventstore.TextSubject{"user", "id", "added"},
-					Sequence:      1,
-					Payload:       mustJSON(t, defaultTestUser.toAdded()),
+					// ResourceOwner: "ro",
+					Subjects: []eventstore.TextSubject{"user", "id", "added"},
+					Sequence: 1,
+					Payload:  mustJSON(t, defaultTestUser.toAdded()),
 				},
 				{
 					EditorService: "svc",
 					EditorUser:    "usr",
-					ResourceOwner: "ro",
-					Subjects:      []eventstore.TextSubject{"user", "id", "removed"},
-					Sequence:      2,
+					// ResourceOwner: "ro",
+					Subjects: []eventstore.TextSubject{"user", "id", "removed"},
+					Sequence: 2,
 				},
 			},
 			wantErr: false,
@@ -254,13 +254,13 @@ func TestEventstore_Filter(t *testing.T) {
 		storage eventstore.Storage
 	}
 	type args struct {
-		filter eventstore.Filter
+		filter *eventstore.Filter
 	}
 	tests := []struct {
 		name    string
 		fields  fields
 		args    args
-		want    []eventstore.EventBase
+		want    []eventstore.Event
 		wantErr bool
 	}{
 		{
@@ -269,15 +269,22 @@ func TestEventstore_Filter(t *testing.T) {
 				storage: memory.New(),
 			},
 			args: args{
-				filter: eventstore.Filter{
-					Subjects: []eventstore.Subject{eventstore.TextSubject("user"), eventstore.TextSubject("id"), eventstore.MultiToken},
+				filter: &eventstore.Filter{
+					Subjects: []*eventstore.SubjectFilter{
+						{
+							Subjects: []eventstore.Subject{
+								eventstore.TextSubject("user"),
+								eventstore.TextSubject("id"),
+								eventstore.MultiToken,
+							},
+						},
+					},
 				},
 			},
-			want: []eventstore.EventBase{
+			want: []eventstore.Event{
 				{
 					EditorService: "svc",
 					EditorUser:    "usr",
-					ResourceOwner: "ro",
 					Subjects:      []eventstore.TextSubject{"user", "id", "added"},
 					Sequence:      1,
 					Payload:       mustJSON(t, defaultTestUser.toAdded()),
@@ -285,7 +292,6 @@ func TestEventstore_Filter(t *testing.T) {
 				{
 					EditorService: "svc",
 					EditorUser:    "usr",
-					ResourceOwner: "ro",
 					Subjects:      []eventstore.TextSubject{"user", "id", "removed"},
 					Sequence:      2,
 				},
@@ -351,10 +357,18 @@ func BenchmarkEventstoreFilter(b *testing.B) {
 				b.FailNow()
 			}
 			for n := 0; n < b.N; n++ {
-				events, err := es.Filter(context.Background(), eventstore.Filter{
-					From:     1,
-					Limit:    2,
-					Subjects: []eventstore.Subject{eventstore.TextSubject("user"), eventstore.SingleToken, eventstore.TextSubject("added")},
+				events, err := es.Filter(context.Background(), &eventstore.Filter{
+					Limit: 2,
+					Subjects: []*eventstore.SubjectFilter{
+						{
+							From: 1,
+							Subjects: []eventstore.Subject{
+								eventstore.TextSubject("user"),
+								eventstore.SingleToken,
+								eventstore.TextSubject("added"),
+							},
+						},
+					},
 				})
 				if err != nil {
 					b.Error(err)

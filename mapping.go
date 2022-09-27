@@ -17,7 +17,7 @@ func (es *Eventstore) RegisterEvent(subs []Subject, mapping mapEvent) *Eventstor
 	return es
 }
 
-func (es *Eventstore) MapEvent(e EventBase) Event {
+func (es *Eventstore) MapEvent(e *Event) *Event {
 	for _, t := range es.types {
 		if event := t.mapEvent(e, 0); event != nil {
 			return event
@@ -32,9 +32,9 @@ func newTyp(s Subject) *typ {
 	}
 }
 
-type mapEvent func(EventBase) Event
+type mapEvent func(*Event) *Event
 
-func baseMapping(e EventBase) Event {
+func baseMapping(e *Event) *Event {
 	return e
 }
 
@@ -49,7 +49,7 @@ func (t *typ) check(s Subject) bool {
 	return mapping(t.sub)(s)
 }
 
-func (t *typ) mapEvent(e EventBase, idx int) Event {
+func (t *typ) mapEvent(e *Event, idx int) *Event {
 	if !t.check(e.Subjects[idx]) {
 		return nil
 	}
@@ -132,10 +132,10 @@ func (m *Mapping) Is(sub Subject) bool {
 }
 
 func (m *Mapping) postPush(event Event, subIdx int) {
-	if event.Base().Subjects[subIdx] != m.s {
+	if event.Subjects[subIdx] != m.s {
 		return
 	}
-	if len(event.Base().Subjects) == subIdx+1 {
+	if len(event.Subjects) == subIdx+1 {
 		for _, f := range m.f {
 			f(event)
 		}

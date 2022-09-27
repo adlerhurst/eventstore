@@ -2,7 +2,6 @@ package storage
 
 import (
 	"encoding/json"
-	"reflect"
 )
 
 func PayloadToBytes(payload interface{}) ([]byte, error) {
@@ -15,19 +14,10 @@ func PayloadToBytes(payload interface{}) ([]byte, error) {
 		}
 		return p, nil
 	}
-	typ := reflect.TypeOf(payload)
 
-	if typ.Kind() == reflect.Ptr {
-		typ = typ.Elem()
+	bytes, err := json.Marshal(payload)
+	if err != nil {
+		return nil, ErrInvalidPayload
 	}
-
-	if typ.Kind() == reflect.Struct {
-		bytes, err := json.Marshal(payload)
-		if err != nil {
-			return nil, ErrInvalidPayload
-		}
-		return bytes, nil
-	}
-
-	return nil, ErrInvalidPayload
+	return bytes, nil
 }

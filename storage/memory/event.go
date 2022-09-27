@@ -5,44 +5,37 @@ import (
 	"github.com/adlerhurst/eventstore/storage"
 )
 
-type events []*event
+func (m *Memory) saveEvents(cmds ...eventstore.Command) (events []*eventstore.Event, err error) {
+	m.seqMu.Lock()
+	defer m.seqMu.Unlock()
 
-// event implements a linked list
-// the aim is to iterate throug events based on the sequence
-type event struct {
-	eventstore.EventBase
+	seq := m.currentSequence
+
+	events = make([]*eventstore.Event, len(cmds))
+	for i, cmd := range cmds {
+		seq++
+		events[i], err = cmdToEvent(cmd, seq)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	m.currentSequence = seq
+	m.events = append(m.events, events...)
+
+	return events, nil
 }
 
-func NewEvent(cmd eventstore.Command, seq uint64) (*event, error) {
+func cmdToEvent(cmd eventstore.Command, seq uint64) (*eventstore.Event, error) {
 	payload, err := storage.PayloadToBytes(cmd.Payload())
 	if err != nil {
 		return nil, err
 	}
-	return &event{
-		EventBase: eventstore.EventBase{
-			EditorService: cmd.EditorService(),
-			EditorUser:    cmd.EditorUser(),
-			Subjects:      cmd.Subjects(),
-			Payload:       payload,
-			Sequence:      seq,
-			ResourceOwner: cmd.ResourceOwner(),
-		},
+	return &eventstore.Event{
+		EditorService: cmd.EditorService(),
+		EditorUser:    cmd.EditorUser(),
+		Payload:       payload,
+		Sequence:      seq,
+		Subjects:      cmd.Subjects(),
 	}, nil
 }
-
-func (e *event) toEventstore() eventstore.EventBase {
-	return eventstore.EventBase{
-		EditorService: e.EditorService,
-		EditorUser:    e.EditorUser,
-		ResourceOwner: e.ResourceOwner,
-		Payload:       e.Payload,
-		Subjects:      e.Subjects,
-		Sequence:      e.Sequence,
-	}
-}
-
-func (a events) Len() int { return len(a) }
-
-func (a events) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
-
-func (a events) Less(i, j int) bool { return a[i].Sequence < a[j].Sequence }

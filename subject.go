@@ -37,9 +37,7 @@ func isSubjectsValid(subs []Subject) bool {
 				return false
 			}
 		case multiToken:
-			if i+1 != len(subs) {
-				return false
-			}
+			return i+1 == len(subs)
 		}
 	}
 	return true

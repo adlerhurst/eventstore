@@ -67,6 +67,13 @@ func Test_isSubjectsValid(t *testing.T) {
 			},
 			want: false,
 		},
+		{
+			name: "all",
+			args: args{
+				subs: []Subject{MultiToken},
+			},
+			want: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

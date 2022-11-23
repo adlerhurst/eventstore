@@ -2,18 +2,31 @@ package zitadel_test
 
 import (
 	"context"
+	"database/sql"
 	"testing"
 
 	"github.com/adlerhurst/eventstore/zitadel"
 	"github.com/adlerhurst/eventstore/zitadel/storage"
+
+	//sql import
+	_ "github.com/jackc/pgx/v4/stdlib"
 )
 
 func TestEventstore_Push(t *testing.T) {
-	crdb1, err := storage.NewCRDB1(testCRDBClient)
+	db, err := sql.Open("pgx", "postgresql://root@localhost:26257/defaultdb?sslmode=disable")
 	if err != nil {
-		t.Fatalf("unable to mock database: %v", err)
+		t.Fatal("unable to connect to db")
 	}
-	crdb2, err := storage.NewCRDB2(testCRDBClient)
+	defer db.Close()
+	// crdb1, err := storage.NewCRDB1(testCRDBClient)
+	// if err != nil {
+	// 	t.Fatalf("unable to mock database: %v", err)
+	// }
+	// crdb2, err := storage.NewCRDB2(testCRDBClient)
+	// if err != nil {
+	// 	t.Fatalf("unable to mock database: %v", err)
+	// }
+	crdb2_2, err := storage.NewCRDB2_2(db)
 	if err != nil {
 		t.Fatalf("unable to mock database: %v", err)
 	}
@@ -28,45 +41,79 @@ func TestEventstore_Push(t *testing.T) {
 		want    []*zitadel.Event
 		wantErr bool
 	}{
+		// {
+		// 	name: "crdb1 sinlge event",
+		// 	es:   zitadel.NewEventstore(crdb1),
+		// 	args: args{
+		// 		cmds: []zitadel.Command{
+		// 			&testCommand{},
+		// 		},
+		// 	},
+		// 	want:    []*zitadel.Event{},
+		// 	wantErr: false,
+		// },
+		// {
+		// 	name: "crdb1 2 events",
+		// 	es:   zitadel.NewEventstore(crdb1),
+		// 	args: args{
+		// 		cmds: []zitadel.Command{
+		// 			&testCommand{},
+		// 			&testCommand{},
+		// 		},
+		// 	},
+		// 	want:    []*zitadel.Event{},
+		// 	wantErr: false,
+		// },
+		// {
+		// 	name: "crdb2 sinlge event",
+		// 	es:   zitadel.NewEventstore(crdb2),
+		// 	args: args{
+		// 		cmds: []zitadel.Command{
+		// 			&testCommand{},
+		// 		},
+		// 	},
+		// 	want:    []*zitadel.Event{},
+		// 	wantErr: false,
+		// },
+		// {
+		// 	name: "crdb2 2 events",
+		// 	es:   zitadel.NewEventstore(crdb2),
+		// 	args: args{
+		// 		cmds: []zitadel.Command{
+		// 			&testCommand{},
+		// 			&testCommand{},
+		// 		},
+		// 	},
+		// 	want:    []*zitadel.Event{},
+		// 	wantErr: false,
+		// },
+		// {
+		// 	name: "crdb2_2 sinlge event",
+		// 	es:   zitadel.NewEventstore(crdb2_2),
+		// 	args: args{
+		// 		cmds: []zitadel.Command{
+		// 			&testCommand{},
+		// 		},
+		// 	},
+		// 	want:    []*zitadel.Event{},
+		// 	wantErr: false,
+		// },
 		{
-			name: "crdb1 sinlge event",
-			es:   zitadel.NewEventstore(crdb1),
+			name: "crdb2_2 2 events",
+			es:   zitadel.NewEventstore(crdb2_2),
 			args: args{
 				cmds: []zitadel.Command{
 					&testCommand{},
-				},
-			},
-			want:    []*zitadel.Event{},
-			wantErr: false,
-		},
-		{
-			name: "crdb1 2 events",
-			es:   zitadel.NewEventstore(crdb1),
-			args: args{
-				cmds: []zitadel.Command{
 					&testCommand{},
 					&testCommand{},
-				},
-			},
-			want:    []*zitadel.Event{},
-			wantErr: false,
-		},
-		{
-			name: "crdb2 sinlge event",
-			es:   zitadel.NewEventstore(crdb2),
-			args: args{
-				cmds: []zitadel.Command{
 					&testCommand{},
-				},
-			},
-			want:    []*zitadel.Event{},
-			wantErr: false,
-		},
-		{
-			name: "crdb2 2 events",
-			es:   zitadel.NewEventstore(crdb2),
-			args: args{
-				cmds: []zitadel.Command{
+					&testCommand{},
+					&testCommand{},
+					&testCommand{},
+					&testCommand{},
+					&testCommand{},
+					&testCommand{},
+					&testCommand{},
 					&testCommand{},
 					&testCommand{},
 				},
@@ -90,11 +137,21 @@ func TestEventstore_Push(t *testing.T) {
 }
 
 func BenchmarkEventstorePush(b *testing.B) {
-	crdb1, err := storage.NewCRDB1(testCRDBClient)
+	db, err := sql.Open("pgx", "postgresql://root@localhost:26257/defaultdb?sslmode=disable")
+	if err != nil {
+		b.Fatal("unable to connect to db")
+	}
+	defer db.Close()
+
+	crdb1, err := storage.NewCRDB1(db)
 	if err != nil {
 		b.Fatalf("unable to mock database: %v", err)
 	}
-	crdb2, err := storage.NewCRDB1(testCRDBClient)
+	crdb2, err := storage.NewCRDB1(db)
+	if err != nil {
+		b.Fatalf("unable to mock database: %v", err)
+	}
+	crdb2_2, err := storage.NewCRDB2_2(db)
 	if err != nil {
 		b.Fatalf("unable to mock database: %v", err)
 	}
@@ -213,6 +270,67 @@ func BenchmarkEventstorePush(b *testing.B) {
 		{
 			name:    "crdb2 10 event no payload",
 			storage: crdb2,
+			cmds: []zitadel.Command{
+				&testCommand{},
+				&testCommand{},
+				&testCommand{},
+				&testCommand{},
+				&testCommand{},
+				&testCommand{},
+				&testCommand{},
+				&testCommand{},
+				&testCommand{},
+				&testCommand{},
+			},
+		},
+		{
+			name:    "crdb2_2 1 event no payload",
+			storage: crdb2_2,
+			cmds: []zitadel.Command{
+				&testCommand{},
+			},
+		},
+		{
+			name:    "crdb2_2 2 events no payload",
+			storage: crdb2_2,
+			cmds: []zitadel.Command{
+				&testCommand{},
+				&testCommand{},
+			},
+		},
+		{
+			name:    "crdb2_2 3 events no payload",
+			storage: crdb2_2,
+			cmds: []zitadel.Command{
+				&testCommand{},
+				&testCommand{},
+				&testCommand{},
+			},
+		},
+		{
+			name:    "crdb2_2 4 events no payload",
+			storage: crdb2_2,
+			cmds: []zitadel.Command{
+				&testCommand{},
+				&testCommand{},
+				&testCommand{},
+				&testCommand{},
+			},
+		},
+		{
+			name:    "crdb2_2 5 event no payload",
+			storage: crdb2_2,
+			cmds: []zitadel.Command{
+				&testCommand{},
+				&testCommand{},
+				&testCommand{},
+				&testCommand{},
+				&testCommand{},
+			},
+		},
+		{
+			name:    "crdb2_2 10 event no payload",
+			storage: crdb2_2,
 			cmds: []zitadel.Command{
 				&testCommand{},
 				&testCommand{},

@@ -12,14 +12,14 @@ func NewEventstore(stor Storage) *Eventstore {
 	}
 }
 
-func (es *Eventstore) Push(ctx context.Context, cmds []Command) ([]Event, error) {
-	return nil, nil
+func (es *Eventstore) Push(ctx context.Context, cmds []Command) ([]*Event, error) {
+	return es.storage.Push(ctx, cmds)
 }
 
 type Storage interface {
-	//Health checks if the storage is available
+	// Health checks if the storage is available
 	Ready(context.Context) error
-	//Push stores the command's and returns the resulting Event's
-	// the command's should be stored in a single transaction.
+	// Push stores the command's and returns the resulting events
+	// the commands are stored in a single transaction.
 	Push(context.Context, []Command) ([]*Event, error)
 }

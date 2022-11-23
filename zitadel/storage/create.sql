@@ -1,5 +1,5 @@
 CREATE TABLE IF NOT EXISTS events (
-    creation_date TIMESTAMPTZ NOT NULL DEFAULT now()
+    creation_date TIMESTAMPTZ NOT NULL DEFAULT statement_timestamp()
     , event_type TEXT NOT NULL
     , aggregate_type TEXT NOT NULL
     , aggregate_id TEXT NOT NULL
@@ -10,5 +10,5 @@ CREATE TABLE IF NOT EXISTS events (
     , resource_owner TEXT NOT NULL
     , instance_id TEXT NOT NULL
 
-    , PRIMARY KEY (instance_id, creation_date DESC) --USING HASH
+    , PRIMARY KEY (instance_id, aggregate_type, aggregate_id, creation_date DESC) --USING HASH
 );

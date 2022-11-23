@@ -9,4 +9,4 @@ INSERT INTO events (
     , resource_owner
     , instance_id
     , creation_date
-) VALUES %s RETURNING creation_date
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, statement_timestamp()) RETURNING creation_date

@@ -75,7 +75,6 @@ func (crdb *CRDB2_2) execPush(ctx context.Context, cmds []zitadel.Command) (_ *s
 					"$" + strconv.Itoa(i*9+7),
 					"$" + strconv.Itoa(i*9+8),
 					"$" + strconv.Itoa(i*9+9),
-					// "$" + strconv.Itoa(i*10+10),
 					"now() + '" + fmt.Sprintf("%f", time.Duration(time.Microsecond*time.Duration(i)).Seconds()) + "s'",
 				},
 				", ") +

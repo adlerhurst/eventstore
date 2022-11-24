@@ -186,10 +186,60 @@ func TestEventstore_Filter(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "default events",
+			name: "simple filter",
 			args: args{
 				filter: &zitadel.Filter{
 					InstanceID: "instance",
+				},
+			},
+			want: []*zitadel.Event{
+				nil,
+				nil,
+				nil,
+			},
+			wantErr: false,
+		},
+		{
+			name: "complex filter",
+			args: args{
+				filter: &zitadel.Filter{
+					InstanceID: "instance",
+					Limit:      3,
+					Desc:       true,
+					Aggregates: []*zitadel.AggregateFilter{
+						{
+							Type: "testAgg",
+							ID:   "1",
+						},
+					},
+				},
+			},
+			want: []*zitadel.Event{
+				nil,
+				nil,
+				nil,
+			},
+			wantErr: false,
+		},
+		{
+			name: "complex filter with lists",
+			args: args{
+				filter: &zitadel.Filter{
+					InstanceID: "instance",
+					Limit:      3,
+					Desc:       true,
+					OrgIDs:     []string{"ro"},
+					Aggregates: []*zitadel.AggregateFilter{
+						{
+							Type: "testAgg",
+							ID:   "1",
+							Events: []*zitadel.EventFilter{
+								{
+									Types: []string{"event.type"},
+								},
+							},
+						},
+					},
 				},
 			},
 			want: []*zitadel.Event{

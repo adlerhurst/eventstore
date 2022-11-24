@@ -45,7 +45,7 @@ func filterToSQL(filter *zitadel.Filter) (clause string, args []any) {
 	}
 
 	if len(filter.OrgIDs) > 0 {
-		clauses = append(clauses, "org_id @> "+arg(&argCounter))
+		clauses = append(clauses, "resource_owner = ANY "+arg(&argCounter))
 		args = append(args, filter.OrgIDs)
 	}
 
@@ -116,7 +116,7 @@ func eventFiltersToSQL(filters []*zitadel.EventFilter, argCount *int, args []any
 }
 
 func eventFilterToSQL(filter *zitadel.EventFilter, argCount *int, args []any) (string, []any) {
-	clause := "event_type @> " + arg(argCount)
+	clause := "event_type = ANY " + arg(argCount)
 	args = append(args, filter.Types)
 
 	return clause, args

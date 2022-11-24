@@ -5,7 +5,6 @@ INSERT INTO events3 (
     , aggregate_version
     , payload
     , editor_user
-    , editor_service
     , resource_owner
     , instance_id
 ) VALUES %s RETURNING id, creation_date

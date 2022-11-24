@@ -14,6 +14,7 @@ var _ zitadel.Storage = (*CRDB1)(nil)
 
 type CRDB1 struct {
 	client *sql.DB
+	unimplementedFilter
 }
 
 var (
@@ -29,7 +30,7 @@ func NewCRDB1(client *sql.DB) (*CRDB1, error) {
 		return nil, err
 	}
 
-	return &CRDB1{client}, nil
+	return &CRDB1{client, unimplementedFilter{}}, nil
 }
 
 func (crdb *CRDB1) Ready(ctx context.Context) error {
@@ -56,7 +57,7 @@ func (crdb *CRDB1) Push(ctx context.Context, cmds []zitadel.Command) (_ []*zitad
 			cmd.Aggregate().Version,
 			payload,
 			cmd.EditorUser(),
-			cmd.EditorService(),
+			"svc",
 			cmd.Aggregate().ResourceOwner,
 			cmd.Aggregate().InstanceID,
 		)

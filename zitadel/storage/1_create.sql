@@ -6,7 +6,6 @@ CREATE TABLE IF NOT EXISTS events1 (
     , aggregate_version TEXT NOT NULL
     , payload JSONB
     , editor_user TEXT NOT NULL 
-    , editor_service TEXT NOT NULL
     , resource_owner TEXT NOT NULL
     , instance_id TEXT NOT NULL
     , region TEXT NULL

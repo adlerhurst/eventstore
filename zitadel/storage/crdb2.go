@@ -17,6 +17,7 @@ var _ zitadel.Storage = (*CRDB2)(nil)
 
 type CRDB2 struct {
 	client *sql.DB
+	unimplementedFilter
 }
 
 var (
@@ -32,7 +33,7 @@ func NewCRDB2(client *sql.DB) (*CRDB2, error) {
 		return nil, err
 	}
 
-	return &CRDB2{client}, nil
+	return &CRDB2{client, unimplementedFilter{}}, nil
 }
 
 func (crdb *CRDB2) Ready(ctx context.Context) error {
@@ -77,7 +78,6 @@ func (crdb *CRDB2) execPush(ctx context.Context, cmds []zitadel.Command) (_ *sql
 			cmd.Aggregate().Version,
 			payload,
 			cmd.EditorUser(),
-			cmd.EditorService(),
 			cmd.Aggregate().ResourceOwner,
 			cmd.Aggregate().InstanceID,
 			creationDate,
@@ -85,16 +85,15 @@ func (crdb *CRDB2) execPush(ctx context.Context, cmds []zitadel.Command) (_ *sql
 		placeholders[i] = "(" +
 			strings.Join(
 				[]string{
-					"$" + strconv.Itoa(i*10+1),
-					"$" + strconv.Itoa(i*10+2),
-					"$" + strconv.Itoa(i*10+3),
-					"$" + strconv.Itoa(i*10+4),
-					"$" + strconv.Itoa(i*10+5),
-					"$" + strconv.Itoa(i*10+6),
-					"$" + strconv.Itoa(i*10+7),
-					"$" + strconv.Itoa(i*10+8),
-					"$" + strconv.Itoa(i*10+9),
-					"$" + strconv.Itoa(i*10+10),
+					"$" + strconv.Itoa(i*9+1),
+					"$" + strconv.Itoa(i*9+2),
+					"$" + strconv.Itoa(i*9+3),
+					"$" + strconv.Itoa(i*9+4),
+					"$" + strconv.Itoa(i*9+5),
+					"$" + strconv.Itoa(i*9+6),
+					"$" + strconv.Itoa(i*9+7),
+					"$" + strconv.Itoa(i*9+8),
+					"$" + strconv.Itoa(i*9+9),
 				},
 				", ") +
 			")"

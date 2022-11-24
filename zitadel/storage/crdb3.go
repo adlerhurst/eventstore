@@ -23,6 +23,8 @@ var (
 	pushStmt3Fmt string
 	//go:embed 3_create.sql
 	createStmt3 string
+	//go:embed 3_filter.sql
+	filterStmt3 string
 )
 
 // NewCRDB3 creates a new client and checks if all requirements are fulfilled.
@@ -48,6 +50,42 @@ func (crdb *CRDB3) Push(ctx context.Context, cmds []zitadel.Command) ([]*zitadel
 	return eventsFromRows3(cmds, rows), nil
 }
 
+func (crdb *CRDB3) Filter(ctx context.Context, filter *zitadel.Filter) ([]*zitadel.Event, error) {
+	query := filterStmt3 + " WHERE "
+	clause, args := filterToSQL(filter)
+	query += clause
+
+	rows, err := crdb.client.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	events := make([]*zitadel.Event, 0, filter.Limit)
+	for rows.Next() {
+		event := new(zitadel.Event)
+		var payload Payload
+		if err := rows.Scan(
+			&event.ID,
+			&event.CreationDate,
+			&event.Type,
+			&event.Aggregate.Type,
+			&event.Aggregate.ID,
+			&event.Aggregate.Version,
+			&payload,
+			&event.EditorUser,
+			&event.Aggregate.ResourceOwner,
+			&event.Aggregate.InstanceID,
+		); err != nil {
+			return nil, err
+		}
+
+		event.Payload = payload
+	}
+
+	return events, nil
+}
+
 func (crdb *CRDB3) execPush(ctx context.Context, cmds []zitadel.Command) (_ *sql.Rows, err error) {
 	args := make([]interface{}, 0, len(cmds)*9)
 	placeholders := make([]string, len(cmds))
@@ -65,7 +103,6 @@ func (crdb *CRDB3) execPush(ctx context.Context, cmds []zitadel.Command) (_ *sql
 			cmd.Aggregate().Version,
 			payload,
 			cmd.EditorUser(),
-			cmd.EditorService(),
 			cmd.Aggregate().ResourceOwner,
 			cmd.Aggregate().InstanceID,
 		)
@@ -73,15 +110,14 @@ func (crdb *CRDB3) execPush(ctx context.Context, cmds []zitadel.Command) (_ *sql
 		placeholders[i] = "(" +
 			strings.Join(
 				[]string{
-					"$" + strconv.Itoa(i*9+1),
-					"$" + strconv.Itoa(i*9+2),
-					"$" + strconv.Itoa(i*9+3),
-					"$" + strconv.Itoa(i*9+4),
-					"$" + strconv.Itoa(i*9+5),
-					"$" + strconv.Itoa(i*9+6),
-					"$" + strconv.Itoa(i*9+7),
-					"$" + strconv.Itoa(i*9+8),
-					"$" + strconv.Itoa(i*9+9),
+					"$" + strconv.Itoa(i*8+1),
+					"$" + strconv.Itoa(i*8+2),
+					"$" + strconv.Itoa(i*8+3),
+					"$" + strconv.Itoa(i*8+4),
+					"$" + strconv.Itoa(i*8+5),
+					"$" + strconv.Itoa(i*8+6),
+					"$" + strconv.Itoa(i*8+7),
+					"$" + strconv.Itoa(i*8+8),
 				},
 				", ") +
 			")"

@@ -44,8 +44,6 @@ type Command interface {
 
 // Event represents a change
 type Event struct {
-	//EditorService is the service which pushed the event
-	EditorService string `json:"-"`
 	//EditorUser is the user which pushed the event
 	EditorUser string `json:"-"`
 	//Payload represents the data as json

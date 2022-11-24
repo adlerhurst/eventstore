@@ -184,16 +184,14 @@ func TestEventstore_Push(t *testing.T) {
 			},
 			want: []eventstore.Event{
 				{
-					EditorService: "svc",
-					EditorUser:    "usr",
+					EditorUser: "usr",
 					// ResourceOwner: "ro",
 					Subjects: []eventstore.TextSubject{"user", "id", "added"},
 					Sequence: 1,
 					Payload:  mustJSON(t, defaultTestUser.toAdded()),
 				},
 				{
-					EditorService: "svc",
-					EditorUser:    "usr",
+					EditorUser: "usr",
 					// ResourceOwner: "ro",
 					Subjects: []eventstore.TextSubject{"user", "id", "removed"},
 					Sequence: 2,
@@ -283,17 +281,15 @@ func TestEventstore_Filter(t *testing.T) {
 			},
 			want: []eventstore.Event{
 				{
-					EditorService: "svc",
-					EditorUser:    "usr",
-					Subjects:      []eventstore.TextSubject{"user", "id", "added"},
-					Sequence:      1,
-					Payload:       mustJSON(t, defaultTestUser.toAdded()),
+					EditorUser: "usr",
+					Subjects:   []eventstore.TextSubject{"user", "id", "added"},
+					Sequence:   1,
+					Payload:    mustJSON(t, defaultTestUser.toAdded()),
 				},
 				{
-					EditorService: "svc",
-					EditorUser:    "usr",
-					Subjects:      []eventstore.TextSubject{"user", "id", "removed"},
-					Sequence:      2,
+					EditorUser: "usr",
+					Subjects:   []eventstore.TextSubject{"user", "id", "removed"},
+					Sequence:   2,
 				},
 			},
 			wantErr: false,

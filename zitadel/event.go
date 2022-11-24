@@ -8,9 +8,7 @@ type Event struct {
 	//CreationDate is the date when the event was written to the store
 	CreationDate time.Time
 	//Aggregate is the metadata of an aggregate
-	Aggregate
-	// EditorService is the service who wants to push the event
-	EditorService string
+	Aggregate Aggregate
 	//EditorUser is the user who wants to push the event
 	EditorUser string
 	//Type must return an event type which should be unique in the aggregate
@@ -33,8 +31,7 @@ func EventFromCommand(cmd Command) *Event {
 			InstanceID:    cmd.Aggregate().ResourceOwner,
 			Version:       cmd.Aggregate().Version,
 		},
-		EditorService: cmd.EditorService(),
-		EditorUser:    cmd.EditorUser(),
-		Type:          cmd.Type(),
+		EditorUser: cmd.EditorUser(),
+		Type:       cmd.Type(),
 	}
 }

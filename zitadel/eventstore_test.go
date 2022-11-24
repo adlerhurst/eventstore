@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"testing"
 
@@ -156,19 +157,58 @@ func BenchmarkEventstorePush(b *testing.B) {
 	}
 }
 
+func TestEventstore_Filter(t *testing.T) {
+	eventstores := createEventstores(t, testCRDBClient)
+
+	type args struct {
+		filter *zitadel.Filter
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    []*zitadel.Event
+		wantErr bool
+	}{
+		{
+			name: "sinlge event",
+			args: args{
+				filter: &zitadel.Filter{
+					InstanceID: "instance",
+				},
+			},
+			want:    []*zitadel.Event{},
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		for esKey, es := range eventstores {
+			t.Run(fmt.Sprintf("%s %s", esKey, tt.name), func(t *testing.T) {
+				_, err := es.Filter(context.Background(), tt.args.filter)
+				if (err != nil) != tt.wantErr && !errors.Is(err, storage.ErrUnimplemented) {
+					t.Errorf("Eventstore.Filter() error = %v, wantErr %v", err, tt.wantErr)
+					return
+				}
+				// if !reflect.DeepEqual(got, tt.want) {
+				// 	t.Errorf("Eventstore.Push() = %v, want %v", got, tt.want)
+				// }
+			})
+		}
+	}
+}
+
 type fataler interface {
 	Fatalf(string, ...any)
 }
 
 func createEventstores(f fataler, db *sql.DB) map[string]*zitadel.Eventstore {
-	crdb1, err := storage.NewCRDB1(db)
-	if err != nil {
-		f.Fatalf("unable to mock database: %v", err)
-	}
-	crdb2, err := storage.NewCRDB1(db)
-	if err != nil {
-		f.Fatalf("unable to mock database: %v", err)
-	}
+	// crdb1, err := storage.NewCRDB1(db)
+	// if err != nil {
+	// 	f.Fatalf("unable to mock database: %v", err)
+	// }
+	// crdb2, err := storage.NewCRDB1(db)
+	// if err != nil {
+	// 	f.Fatalf("unable to mock database: %v", err)
+	// }
 	crdb2_2, err := storage.NewCRDB2_2(db)
 	if err != nil {
 		f.Fatalf("unable to mock database: %v", err)
@@ -179,8 +219,8 @@ func createEventstores(f fataler, db *sql.DB) map[string]*zitadel.Eventstore {
 	}
 
 	return map[string]*zitadel.Eventstore{
-		"crdb1":   zitadel.NewEventstore(crdb1),
-		"crdb2":   zitadel.NewEventstore(crdb2),
+		// "crdb1":   zitadel.NewEventstore(crdb1),
+		// "crdb2":   zitadel.NewEventstore(crdb2),
 		"crdb2_2": zitadel.NewEventstore(crdb2_2),
 		"crdb3":   zitadel.NewEventstore(crdb3),
 	}

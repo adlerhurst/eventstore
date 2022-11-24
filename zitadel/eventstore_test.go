@@ -160,6 +160,12 @@ func BenchmarkEventstorePush(b *testing.B) {
 func TestEventstore_Filter(t *testing.T) {
 	eventstores := createEventstores(t, testCRDBClient)
 
+	defaults := []zitadel.Command{
+		&testCommand{},
+		&testCommand{},
+		&testCommand{},
+	}
+
 	type args struct {
 		filter *zitadel.Filter
 	}
@@ -170,23 +176,47 @@ func TestEventstore_Filter(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name: "sinlge event",
+			name: "no events",
 			args: args{
 				filter: &zitadel.Filter{
-					InstanceID: "instance",
+					InstanceID: "no instance",
 				},
 			},
 			want:    []*zitadel.Event{},
 			wantErr: false,
 		},
+		{
+			name: "default events",
+			args: args{
+				filter: &zitadel.Filter{
+					InstanceID: "instance",
+				},
+			},
+			want: []*zitadel.Event{
+				nil,
+				nil,
+				nil,
+			},
+			wantErr: false,
+		},
 	}
-	for _, tt := range tests {
-		for esKey, es := range eventstores {
+
+	for esKey, es := range eventstores {
+		if _, err := es.Push(context.Background(), defaults); err != nil {
+			t.Fatalf("unable to push default events: %v", err)
+		}
+		for _, tt := range tests {
 			t.Run(fmt.Sprintf("%s %s", esKey, tt.name), func(t *testing.T) {
-				_, err := es.Filter(context.Background(), tt.args.filter)
-				if (err != nil) != tt.wantErr && !errors.Is(err, storage.ErrUnimplemented) {
+				events, err := es.Filter(context.Background(), tt.args.filter)
+				if errors.Is(err, storage.ErrUnimplemented) {
+					return
+				}
+				if (err != nil) != tt.wantErr {
 					t.Errorf("Eventstore.Filter() error = %v, wantErr %v", err, tt.wantErr)
 					return
+				}
+				if len(tt.want) != len(events) {
+					t.Errorf("Eventstore.Filter() expected event count %d, got %d", len(tt.want), len(events))
 				}
 				// if !reflect.DeepEqual(got, tt.want) {
 				// 	t.Errorf("Eventstore.Push() = %v, want %v", got, tt.want)
@@ -278,10 +308,6 @@ func (cmd *testCommand) Aggregate() zitadel.Aggregate {
 		InstanceID:    "instance",
 		Version:       "v1",
 	}
-}
-
-func (cmd *testCommand) EditorService() string {
-	return "svc"
 }
 
 func (cmd *testCommand) EditorUser() string {

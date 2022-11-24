@@ -1,4 +1,5 @@
-SELECT event_type
+SELECT 
+    event_type
     , id
     , creation_date
     , event_type

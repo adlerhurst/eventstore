@@ -66,6 +66,7 @@ func (crdb *CRDB3) Filter(ctx context.Context, filter *zitadel.Filter) ([]*zitad
 		event := new(zitadel.Event)
 		var payload Payload
 		if err := rows.Scan(
+			&event.Type,
 			&event.ID,
 			&event.CreationDate,
 			&event.Type,
@@ -81,6 +82,7 @@ func (crdb *CRDB3) Filter(ctx context.Context, filter *zitadel.Filter) ([]*zitad
 		}
 
 		event.Payload = payload
+		events = append(events, event)
 	}
 
 	return events, nil

@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	_ "embed"
+	"encoding/json"
 	"fmt"
 	"strconv"
 	"strings"
@@ -19,13 +20,15 @@ type CRDB2 struct {
 }
 
 var (
-	//go:embed push.sql
-	pushStmtFmt string
+	//go:embed 2_push.sql
+	pushStmt2Fmt string
+	//go:embed 2_create.sql
+	createStmt2 string
 )
 
 // NewCRDB2 creates a new client and checks if all requirements are fulfilled.
 func NewCRDB2(client *sql.DB) (*CRDB2, error) {
-	if _, err := client.Exec(createTableStmt); err != nil {
+	if _, err := client.Exec(createStmt2); err != nil {
 		return nil, err
 	}
 
@@ -43,7 +46,7 @@ func (crdb *CRDB2) Push(ctx context.Context, cmds []zitadel.Command) ([]*zitadel
 	}
 	defer rows.Close()
 
-	return eventsFromRows(cmds, rows), nil
+	return eventsFromRows2(cmds, rows), nil
 }
 
 func (crdb *CRDB2) execPush(ctx context.Context, cmds []zitadel.Command) (_ *sql.Rows, err error) {
@@ -98,7 +101,7 @@ func (crdb *CRDB2) execPush(ctx context.Context, cmds []zitadel.Command) (_ *sql
 	}
 
 	rows, err := crdb.client.QueryContext(ctx,
-		fmt.Sprintf(pushStmtFmt,
+		fmt.Sprintf(pushStmt2Fmt,
 			strings.Join(placeholders, ", "),
 		),
 		args...)
@@ -112,4 +115,26 @@ func (crdb *CRDB2) execPush(ctx context.Context, cmds []zitadel.Command) (_ *sql
 	}
 
 	return rows, err
+}
+
+func eventsFromRows2(cmds []zitadel.Command, rows *sql.Rows) []*zitadel.Event {
+	var err error
+	events := make([]*zitadel.Event, len(cmds))
+
+	for i := 0; rows.Next(); i++ {
+		events[i] = zitadel.EventFromCommand(cmds[i])
+		if cmds[i].Payload() != nil {
+			events[i].Payload, err = json.Marshal(cmds[i].Payload())
+			if err != nil {
+				// this error must never occure because
+				// it should happen before push
+				panic(fmt.Sprintf("error occured in marshal after push: %v", err))
+			}
+		}
+		if err = rows.Scan(&events[i].CreationDate); err != nil {
+			// if this error occures we are fucked
+			panic(fmt.Sprintf("error occured in scan after push: %v", err))
+		}
+	}
+	return events
 }

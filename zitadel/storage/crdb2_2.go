@@ -20,7 +20,7 @@ type CRDB2_2 struct {
 
 // NewCRDB2_2 creates a new client and checks if all requirements are fulfilled.
 func NewCRDB2_2(client *sql.DB) (*CRDB2_2, error) {
-	if _, err := client.Exec(createTableStmt); err != nil {
+	if _, err := client.Exec(createStmt2); err != nil {
 		return nil, err
 	}
 
@@ -38,7 +38,7 @@ func (crdb *CRDB2_2) Push(ctx context.Context, cmds []zitadel.Command) ([]*zitad
 	}
 	defer rows.Close()
 
-	return eventsFromRows(cmds, rows), nil
+	return eventsFromRows2(cmds, rows), nil
 }
 
 func (crdb *CRDB2_2) execPush(ctx context.Context, cmds []zitadel.Command) (_ *sql.Rows, err error) {
@@ -82,7 +82,7 @@ func (crdb *CRDB2_2) execPush(ctx context.Context, cmds []zitadel.Command) (_ *s
 	}
 
 	return crdb.client.QueryContext(ctx,
-		fmt.Sprintf(pushStmtFmt,
+		fmt.Sprintf(pushStmt2Fmt,
 			strings.Join(placeholders, ", "),
 		),
 		args...)

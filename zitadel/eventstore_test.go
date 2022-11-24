@@ -15,24 +15,7 @@ import (
 )
 
 func TestEventstore_Push(t *testing.T) {
-	crdb1, err := storage.NewCRDB1(testCRDBClient)
-	if err != nil {
-		t.Fatalf("unable to mock database: %v", err)
-	}
-	crdb2, err := storage.NewCRDB2(testCRDBClient)
-	if err != nil {
-		t.Fatalf("unable to mock database: %v", err)
-	}
-	crdb2_2, err := storage.NewCRDB2_2(testCRDBClient)
-	if err != nil {
-		t.Fatalf("unable to mock database: %v", err)
-	}
-
-	eventstores := map[string]*zitadel.Eventstore{
-		"crdb1":   zitadel.NewEventstore(crdb1),
-		"crdb2":   zitadel.NewEventstore(crdb2),
-		"crdb2_2": zitadel.NewEventstore(crdb2_2),
-	}
+	eventstores := createEventstores(t, testCRDBClient)
 
 	type args struct {
 		cmds []zitadel.Command
@@ -190,11 +173,16 @@ func createEventstores(f fataler, db *sql.DB) map[string]*zitadel.Eventstore {
 	if err != nil {
 		f.Fatalf("unable to mock database: %v", err)
 	}
+	crdb3, err := storage.NewCRDB3(db)
+	if err != nil {
+		f.Fatalf("unable to mock database: %v", err)
+	}
 
 	return map[string]*zitadel.Eventstore{
 		"crdb1":   zitadel.NewEventstore(crdb1),
 		"crdb2":   zitadel.NewEventstore(crdb2),
 		"crdb2_2": zitadel.NewEventstore(crdb2_2),
+		"crdb3":   zitadel.NewEventstore(crdb3),
 	}
 }
 

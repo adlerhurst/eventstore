@@ -17,13 +17,15 @@ type CRDB1 struct {
 }
 
 var (
-	//go:embed push_single.sql
-	pushStmt string
+	//go:embed 1_push.sql
+	pushStmt1 string
+	//go:embed 1_create.sql
+	createStmt1 string
 )
 
 // NewCRDB1 creates a new client and checks if all requirements are fulfilled.
 func NewCRDB1(client *sql.DB) (*CRDB1, error) {
-	if _, err := client.Exec(createTableStmt); err != nil {
+	if _, err := client.Exec(createStmt1); err != nil {
 		return nil, err
 	}
 
@@ -47,7 +49,7 @@ func (crdb *CRDB1) Push(ctx context.Context, cmds []zitadel.Command) (_ []*zitad
 			return nil, err
 		}
 
-		row := tx.QueryRow(pushStmt,
+		row := tx.QueryRow(pushStmt1,
 			cmd.Type(),
 			cmd.Aggregate().Type,
 			cmd.Aggregate().ID,

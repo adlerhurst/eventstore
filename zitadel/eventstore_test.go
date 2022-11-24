@@ -190,6 +190,7 @@ func TestEventstore_Filter(t *testing.T) {
 			args: args{
 				filter: &zitadel.Filter{
 					InstanceID: "instance",
+					Limit:      3,
 				},
 			},
 			want: []*zitadel.Event{
@@ -268,9 +269,6 @@ func TestEventstore_Filter(t *testing.T) {
 				if len(tt.want) != len(events) {
 					t.Errorf("Eventstore.Filter() expected event count %d, got %d", len(tt.want), len(events))
 				}
-				// if !reflect.DeepEqual(got, tt.want) {
-				// 	t.Errorf("Eventstore.Push() = %v, want %v", got, tt.want)
-				// }
 			})
 		}
 	}

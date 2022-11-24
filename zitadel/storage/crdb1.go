@@ -41,14 +41,12 @@ func (crdb *CRDB1) Push(ctx context.Context, cmds []zitadel.Command) (_ []*zitad
 		return nil, err
 	}
 	for i, cmd := range cmds {
-		var payload Payload
-		if cmds[i].Payload() != nil {
-			payload, err = json.Marshal(cmds[i].Payload())
-			if err != nil {
-				tx.Rollback()
-				return nil, err
-			}
+		payload, err := payloadToJSON(cmds[i].Payload())
+		if err != nil {
+			tx.Rollback()
+			return nil, err
 		}
+
 		row := tx.QueryRow(pushStmt,
 			cmd.Type(),
 			cmd.Aggregate().Type,

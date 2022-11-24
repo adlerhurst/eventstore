@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	_ "embed"
-	"encoding/json"
 	"fmt"
 	"strconv"
 	"strings"
@@ -61,14 +60,13 @@ func (crdb *CRDB2) execPush(ctx context.Context, cmds []zitadel.Command) (_ *sql
 			tx.Rollback()
 			return nil, err
 		}
-		var payload Payload
-		if cmds[i].Payload() != nil {
-			payload, err = json.Marshal(cmds[i].Payload())
-			if err != nil {
-				tx.Rollback()
-				return nil, err
-			}
+
+		payload, err := payloadToJSON(cmds[i].Payload())
+		if err != nil {
+			tx.Rollback()
+			return nil, err
 		}
+
 		args = append(args,
 			cmd.Type(),
 			cmd.Aggregate().Type,

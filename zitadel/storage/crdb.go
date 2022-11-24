@@ -35,3 +35,13 @@ func eventsFromRows(cmds []zitadel.Command, rows *sql.Rows) []*zitadel.Event {
 	}
 	return events
 }
+
+func payloadToJSON(payload interface{}) (Payload, error) {
+	if payload == nil {
+		return nil, nil
+	}
+	if p, ok := payload.([]byte); ok && json.Valid(p) {
+		return p, nil
+	}
+	return json.Marshal(payload)
+}

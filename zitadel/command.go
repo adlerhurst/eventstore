@@ -17,4 +17,6 @@ type Command interface {
 	Payload() interface{}
 	//TODO: UniqueConstraints should be added for unique attributes of an event, if nil constraints will not be checked
 	// UniqueConstraints() []*EventUniqueConstraint
+	// Version is the semver this command represents
+	Version() string
 }

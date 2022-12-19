@@ -20,6 +20,8 @@ type Event struct {
 	// * struct which can be marshalled to json
 	// * pointer to struct which can be marshalled to json
 	Payload []byte
+	//Version is the semver this event represents
+	Version string `json:"-"`
 }
 
 func EventFromCommand(cmd Command) *Event {
@@ -29,8 +31,8 @@ func EventFromCommand(cmd Command) *Event {
 			Type:          cmd.Aggregate().Type,
 			ResourceOwner: cmd.Aggregate().ResourceOwner,
 			InstanceID:    cmd.Aggregate().ResourceOwner,
-			Version:       cmd.Aggregate().Version,
 		},
+		Version:    cmd.Version(),
 		EditorUser: cmd.EditorUser(),
 		Type:       cmd.Type(),
 	}

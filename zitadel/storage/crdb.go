@@ -36,8 +36,10 @@ func filterToSQL(filter *zitadel.Filter) (clause string, args []any) {
 	clauses := make([]string, 0, 5)
 	args = make([]any, 0, 5)
 
-	clauses = append(clauses, "instance_id = "+arg(&argCounter))
-	args = append(args, filter.InstanceID)
+	if filter.InstanceID != "" {
+		clauses = append(clauses, "instance_id = "+arg(&argCounter))
+		args = append(args, filter.InstanceID)
+	}
 
 	if !filter.CreationDateGreaterEqual.IsZero() {
 		clauses = append(clauses, "creation_date >= "+arg(&argCounter))

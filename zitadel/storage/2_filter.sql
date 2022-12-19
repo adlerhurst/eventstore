@@ -1,5 +1,7 @@
-INSERT INTO events2 (
+SELECT 
     event_type
+    , creation_date
+    , event_type
     , aggregate_type
     , aggregate_id
     , event_version
@@ -7,5 +9,4 @@ INSERT INTO events2 (
     , editor_user
     , resource_owner
     , instance_id
-    , creation_date
-) VALUES %s RETURNING creation_date
+FROM events2

@@ -13,8 +13,11 @@ type Filter struct {
 	// check if tx is nil for as of system time
 	// else creation_date < `CreationDateLessEqual`
 
-	InstanceID               string //required
-	Aggregates               []*AggregateFilter
+	//InstaceID is required, a filter is only allowed to search in a single instace
+	InstanceID string
+	//Aggregates allow to filter for specific aggregates
+	Aggregates []*AggregateFilter
+	//OrgIDs
 	OrgIDs                   StringArray //mandatory
 	CreationDateGreaterEqual time.Time
 	CreationDateLess         time.Time
@@ -32,6 +35,11 @@ type AggregateFilter struct {
 type EventFilter struct {
 	Types StringArray //required
 	// FUTURE: Payload map[string]any
+}
+
+func validateFilter(f *Filter) error {
+
+	return nil
 }
 
 type StringArray []string

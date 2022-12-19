@@ -25,6 +25,8 @@ var (
 	pushStmt2Fmt string
 	//go:embed 2_create.sql
 	createStmt2 string
+	//go:embed 2_filter.sql
+	filterStmt2 string
 )
 
 // NewCRDB2 creates a new client and checks if all requirements are fulfilled.
@@ -75,7 +77,7 @@ func (crdb *CRDB2) execPush(ctx context.Context, cmds []zitadel.Command) (_ *sql
 			cmd.Type(),
 			cmd.Aggregate().Type,
 			cmd.Aggregate().ID,
-			cmd.Aggregate().Version,
+			cmd.Version(),
 			payload,
 			cmd.EditorUser(),
 			cmd.Aggregate().ResourceOwner,

@@ -54,7 +54,7 @@ func (crdb *CRDB1) Push(ctx context.Context, cmds []zitadel.Command) (_ []*zitad
 			cmd.Type(),
 			cmd.Aggregate().Type,
 			cmd.Aggregate().ID,
-			cmd.Aggregate().Version,
+			cmd.Version(),
 			payload,
 			cmd.EditorUser(),
 			"svc",

@@ -10,6 +10,4 @@ type Aggregate struct {
 	ResourceOwner string `json:"-"`
 	//InstanceID is the instance this aggregate belongs to
 	InstanceID string `json:"-"`
-	//Version is the semver this aggregate represents
-	Version string `json:"-"`
 }

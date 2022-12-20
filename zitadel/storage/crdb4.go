@@ -95,10 +95,7 @@ func (crdb *CRDB4) Push(ctx context.Context, cmds []zitadel.Command) (events []*
 
 func (crdb *CRDB4) Filter(ctx context.Context, filter *zitadel.Filter) ([]*zitadel.Event, error) {
 	query := filterStmt4 + " WHERE "
-	clause, args, err := filterToSQL4(filter)
-	if err != nil {
-		return nil, err
-	}
+	clause, args := filterToSQL4(filter)
 	query += clause
 
 	rows, err := crdb.client.QueryContext(ctx, query, args...)
@@ -132,7 +129,7 @@ func cmdToEvent4(cmd zitadel.Command) (event, payloadBytes []byte, err error) {
 	}
 
 	event, err = json.Marshal(&Event4{
-		Aggregate: Aggregate4{
+		Aggregate: &Aggregate4{
 			ID:            cmd.Aggregate().ID,
 			Type:          cmd.Aggregate().Type,
 			ResourceOwner: cmd.Aggregate().ResourceOwner,
@@ -152,27 +149,27 @@ func cmdToEvent4(cmd zitadel.Command) (event, payloadBytes []byte, err error) {
 
 type Event4 struct {
 	// Aggregate is the metadata of an aggregate
-	Aggregate Aggregate4 `json:"aggregate,omitempty"`
+	Aggregate *Aggregate4 `json:"aggregate"`
 	// EditorUser is the user who wants to push the event
-	EditorUser string `json:"editorUser,omitempty"`
+	EditorUser string `json:"editorUser"`
 	// Type must return an event type which should be unique in the aggregate
-	Type string `json:"type,omitempty"`
+	Type string `json:"type"`
 	// Payload of the event
 	Payload map[string]interface{} `json:"payload,omitempty"`
 	// Version is the semver this event represents
-	Version string `json:"version,omitempty"`
+	Version string `json:"version"`
 }
 
 // Aggregate is the basic implementation of Aggregater
 type Aggregate4 struct {
 	//ID is the unique identitfier of this aggregate
-	ID string `json:"id,omitempty"`
+	ID string `json:"id"`
 	//Type is the name of the aggregate.
-	Type string `json:"type,omitempty"`
+	Type string `json:"type"`
 	//ResourceOwner is the org this aggregates belongs to
-	ResourceOwner string `json:"owner,omitempty"`
+	ResourceOwner string `json:"owner"`
 	//InstanceID is the instance this aggregate belongs to
-	InstanceID string `json:"instance,omitempty"`
+	InstanceID string `json:"instance"`
 }
 
 // Payload4 represents a generic json object that may be null.
@@ -216,14 +213,7 @@ func (p *Payload4) Scan(value interface{}) error {
 // 	return []byte(p), nil
 // }
 
-func filterToSQL4(filter *zitadel.Filter) (clause string, args []any, err error) {
-	var detailClauses []*Event4
-	if len(filter.Aggregates) > 0 {
-		detailClauses = aggregatesFilter(filter.Aggregates)
-	} else {
-		detailClauses = append(detailClauses, new(Event4))
-	}
-
+func filterToSQL4(filter *zitadel.Filter) (clause string, args []any) {
 	if !filter.CreationDateLess.IsZero() {
 		clause += "AS OF SYSTEM TIME '" + filter.CreationDateLess.Add(1*time.Microsecond).
 			Format(sqlTimeLayout) + "' "
@@ -238,18 +228,22 @@ func filterToSQL4(filter *zitadel.Filter) (clause string, args []any, err error)
 		args = append(args, filter.CreationDateGreaterEqual)
 	}
 
-	for _, clause := range detailClauses {
-		clause.Aggregate.InstanceID = filter.InstanceID
-		if len(filter.OrgIDs) > 0 {
-			clause.Aggregate.ResourceOwner = filter.OrgIDs[0]
-		}
+	if len(filter.Aggregates) > 0 {
+		var aggregatesClause string
+		aggregatesClause, args = aggregatesFilter(filter.Aggregates, &argCounter, args)
+		clauses = append(clauses, aggregatesClause)
+	}
 
-		clauses = append(clauses, "event @> "+arg(&argCounter))
-		arg, err := clause.toClause()
-		if err != nil {
-			return "", nil, err
-		}
-		args = append(args, arg)
+	if len(filter.OrgIDs) > 0 {
+		var orgClause string
+		orgClause, args = ownerFilter(filter.OrgIDs, &argCounter, args)
+		clauses = append(clauses, orgClause)
+	}
+
+	if filter.InstanceID != "" {
+		var instanceClause string
+		instanceClause, args = instanceFilter(filter.InstanceID, &argCounter, args)
+		clauses = append(clauses, instanceClause)
 	}
 
 	clause += strings.Join(clauses, " AND ")
@@ -264,57 +258,85 @@ func filterToSQL4(filter *zitadel.Filter) (clause string, args []any, err error)
 		args = append(args, filter.Limit)
 	}
 
-	return clause, args, nil
+	return clause, args
 }
 
-func aggregatesFilter(aggregates []*zitadel.AggregateFilter) (clauses []*Event4) {
-	for _, aggregate := range aggregates {
-		clauses = append(clauses, aggregateFilter(aggregate)...)
+func ownerFilter(orgs []string, argCounter *int, args []any) (string, []any) {
+	clauses := make([]string, len(orgs))
+	for i, org := range orgs {
+		clauses[i] = eventClause(argCounter)
+		args = append(args, aggregateArg("owner", org))
 	}
 
-	return clauses
+	return strings.Join(clauses, " OR "), args
 }
 
-func aggregateFilter(aggregate *zitadel.AggregateFilter) (clauses []*Event4) {
+func instanceFilter(instance string, argCounter *int, args []any) (clause string, _ []any) {
+	return eventClause(argCounter), append(args, aggregateArg("instance", instance))
+}
+
+func aggregatesFilter(aggregates []*zitadel.AggregateFilter, argCounter *int, args []any) (string, []any) {
+	clauses := make([]string, len(aggregates))
+	for i, filter := range aggregates {
+		clauses[i], args = aggregateFilter(filter, argCounter, args)
+		clauses[i] = "(" + clauses[i] + ")"
+	}
+
+	return strings.Join(clauses, " OR "), args
+}
+
+func aggregateFilter(aggregate *zitadel.AggregateFilter, argCounter *int, args []any) (string, []any) {
+	clauses := make([]string, 0, 3)
+
+	clauses = append(clauses, eventClause(argCounter))
+	args = append(args, aggregateArg("type", aggregate.Type))
+
+	if aggregate.ID != "" {
+		clauses = append(clauses, eventClause(argCounter))
+		args = append(args, aggregateArg("id", aggregate.ID))
+	}
+
 	if len(aggregate.Events) > 0 {
-		clauses = append(clauses, eventsFilter(aggregate.Events)...)
-	} else {
-		clauses = append(clauses, new(Event4))
-	}
-
-	for _, clause := range clauses {
-		clause.Aggregate.Type = aggregate.Type
-		if aggregate.ID != "" {
-			clause.Aggregate.ID = aggregate.ID
+		var eventsClause string
+		eventsClause, args = eventsFilter(aggregate.Events, argCounter, args)
+		if len(aggregate.Events) > 1 {
+			eventsClause = "(" + eventsClause + ")"
 		}
+		clauses = append(clauses, eventsClause)
 	}
 
-	return clauses
+	return strings.Join(clauses, " AND "), args
 }
 
-func eventsFilter(events []*zitadel.EventFilter) []*Event4 {
-	clauses := make([]*Event4, 0, len(events))
+func eventsFilter(events []*zitadel.EventFilter, argCounter *int, args []any) (string, []any) {
+	clauses := make([]string, len(events))
 
-	for _, event := range events {
-		clauses = append(clauses, eventFilter(event)...)
+	for i, event := range events {
+		clauses[i], args = eventFilter(event, argCounter, args)
 	}
 
-	return clauses
+	return strings.Join(clauses, " OR "), args
 }
 
-func eventFilter(event *zitadel.EventFilter) []*Event4 {
-	events := make([]*Event4, len(event.Types))
+func eventFilter(event *zitadel.EventFilter, argCounter *int, args []any) (string, []any) {
+	clauses := make([]string, len(event.Types))
 
 	for i, typ := range event.Types {
-		events[i] = &Event4{
-			Type: typ,
-		}
+		clauses[i] = eventClause(argCounter)
+		args = append(args, eventArg("type", typ))
 	}
 
-	return events
+	return strings.Join(clauses, " OR "), args
 }
 
-func (e *Event4) toClause() (string, error) {
-	clause, err := json.Marshal(e)
-	return string(clause), err
+func eventClause(argCounter *int) string {
+	return "event @> " + arg(argCounter)
+}
+
+func aggregateArg(key, field string) string {
+	return `{"aggregate": {"` + key + `": "` + field + `"}}`
+}
+
+func eventArg(key, field string) string {
+	return `{"` + key + `": "` + field + `"}`
 }

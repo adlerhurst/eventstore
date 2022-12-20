@@ -52,8 +52,8 @@ func TestEventstore_Push(t *testing.T) {
 			wantErr: false,
 		},
 	}
-	for _, tt := range tests {
-		for esKey, es := range eventstores {
+	for esKey, es := range eventstores {
+		for _, tt := range tests {
 			t.Run(fmt.Sprintf("%s %s", esKey, tt.name), func(t *testing.T) {
 				_, err := es.Push(context.Background(), tt.args.cmds)
 				if (err != nil) != tt.wantErr {
@@ -581,20 +581,25 @@ func createEventstores(f fataler, db *sql.DB) map[string]*zitadel.Eventstore {
 	// if err != nil {
 	// 	f.Fatalf("unable to mock database: %v", err)
 	// }
-	crdb2_2, err := storage.NewCRDB2_2(db)
-	if err != nil {
-		f.Fatalf("unable to mock database: %v", err)
-	}
+	// crdb2_2, err := storage.NewCRDB2_2(db)
+	// if err != nil {
+	// 	f.Fatalf("unable to mock database: %v", err)
+	// }
 	// crdb3, err := storage.NewCRDB3(db)
 	// if err != nil {
 	// 	f.Fatalf("unable to mock database: %v", err)
 	// }
+	crdb4, err := storage.NewCRDB4(db)
+	if err != nil {
+		f.Fatalf("unable to mock database: %v", err)
+	}
 
 	return map[string]*zitadel.Eventstore{
 		// "crdb1":   zitadel.NewEventstore(crdb1),
 		// "crdb2":   zitadel.NewEventstore(crdb2),
-		"crdb2_2": zitadel.NewEventstore(crdb2_2),
+		// "crdb2_2": zitadel.NewEventstore(crdb2_2),
 		// "crdb3":   zitadel.NewEventstore(crdb3),
+		"crdb4": zitadel.NewEventstore(crdb4),
 	}
 }
 

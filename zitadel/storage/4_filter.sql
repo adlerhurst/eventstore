@@ -1,4 +1,4 @@
 SELECT 
-    , creation_date
+    creation_date
     , event
 FROM events4

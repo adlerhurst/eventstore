@@ -18,6 +18,7 @@ type Filter struct {
 	//Aggregates allow to filter for specific aggregates
 	Aggregates []*AggregateFilter
 	//OrgIDs
+	// TODO: does it make sense to filter more than 1 resource owner?
 	OrgIDs                   StringArray //mandatory
 	CreationDateGreaterEqual time.Time
 	CreationDateLess         time.Time

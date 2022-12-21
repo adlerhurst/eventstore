@@ -100,50 +100,98 @@ func BenchmarkEventstorePush(b *testing.B) {
 		{
 			name: "2 events",
 			cmds: []zitadel.Command{
-				cmd,
-				cmd,
+				&testCommand{
+					aggID: "1",
+				},
+				&testCommand{
+					aggID: "2",
+				},
 			},
 		},
 		{
 			name: "3 events",
 			cmds: []zitadel.Command{
-				cmd,
-				cmd,
-				cmd,
+				&testCommand{
+					aggID: "1",
+				},
+				&testCommand{
+					aggID: "2",
+				},
+				&testCommand{
+					aggID: "3",
+				},
 			},
 		},
 		{
 			name: "4 events",
 			cmds: []zitadel.Command{
-				cmd,
-				cmd,
-				cmd,
-				cmd,
+				&testCommand{
+					aggID: "1",
+				},
+				&testCommand{
+					aggID: "2",
+				},
+				&testCommand{
+					aggID: "3",
+				},
+				&testCommand{
+					aggID: "4",
+				},
 			},
 		},
 		{
 			name: "5 event",
 			cmds: []zitadel.Command{
-				cmd,
-				cmd,
-				cmd,
-				cmd,
-				cmd,
+				&testCommand{
+					aggID: "1",
+				},
+				&testCommand{
+					aggID: "2",
+				},
+				&testCommand{
+					aggID: "3",
+				},
+				&testCommand{
+					aggID: "4",
+				},
+				&testCommand{
+					aggID: "5",
+				},
 			},
 		},
 		{
 			name: "10 event",
 			cmds: []zitadel.Command{
-				cmd,
-				cmd,
-				cmd,
-				cmd,
-				cmd,
-				cmd,
-				cmd,
-				cmd,
-				cmd,
-				cmd,
+				&testCommand{
+					aggID: "1",
+				},
+				&testCommand{
+					aggID: "2",
+				},
+				&testCommand{
+					aggID: "3",
+				},
+				&testCommand{
+					aggID: "4",
+				},
+				&testCommand{
+					aggID: "5",
+				},
+				&testCommand{
+					aggID: "6",
+				},
+				&testCommand{
+					aggID: "7",
+				},
+				&testCommand{
+					aggID: "8",
+				},
+				&testCommand{
+					aggID: "9",
+				},
+				&testCommand{
+					aggID: "10",
+				},
 			},
 		},
 		{
@@ -199,56 +247,106 @@ func BenchmarkEventstorePushParallel(b *testing.B) {
 		{
 			name: "1 event",
 			cmds: []zitadel.Command{
-				cmd,
+				&testCommand{
+					aggID: "",
+				},
 			},
 		},
 		{
 			name: "2 events",
 			cmds: []zitadel.Command{
-				cmd,
-				cmd,
+				&testCommand{
+					aggID: "1",
+				},
+				&testCommand{
+					aggID: "2",
+				},
 			},
 		},
 		{
 			name: "3 events",
 			cmds: []zitadel.Command{
-				cmd,
-				cmd,
-				cmd,
+				&testCommand{
+					aggID: "1",
+				},
+				&testCommand{
+					aggID: "2",
+				},
+				&testCommand{
+					aggID: "3",
+				},
 			},
 		},
 		{
 			name: "4 events",
 			cmds: []zitadel.Command{
-				cmd,
-				cmd,
-				cmd,
-				cmd,
+				&testCommand{
+					aggID: "1",
+				},
+				&testCommand{
+					aggID: "2",
+				},
+				&testCommand{
+					aggID: "3",
+				},
+				&testCommand{
+					aggID: "4",
+				},
 			},
 		},
 		{
 			name: "5 event",
 			cmds: []zitadel.Command{
-				cmd,
-				cmd,
-				cmd,
-				cmd,
-				cmd,
+				&testCommand{
+					aggID: "1",
+				},
+				&testCommand{
+					aggID: "2",
+				},
+				&testCommand{
+					aggID: "3",
+				},
+				&testCommand{
+					aggID: "4",
+				},
+				&testCommand{
+					aggID: "5",
+				},
 			},
 		},
 		{
 			name: "10 event",
 			cmds: []zitadel.Command{
-				cmd,
-				cmd,
-				cmd,
-				cmd,
-				cmd,
-				cmd,
-				cmd,
-				cmd,
-				cmd,
-				cmd,
+				&testCommand{
+					aggID: "1",
+				},
+				&testCommand{
+					aggID: "2",
+				},
+				&testCommand{
+					aggID: "3",
+				},
+				&testCommand{
+					aggID: "4",
+				},
+				&testCommand{
+					aggID: "5",
+				},
+				&testCommand{
+					aggID: "6",
+				},
+				&testCommand{
+					aggID: "7",
+				},
+				&testCommand{
+					aggID: "8",
+				},
+				&testCommand{
+					aggID: "9",
+				},
+				&testCommand{
+					aggID: "10",
+				},
 			},
 		},
 		// {
@@ -317,7 +415,30 @@ func BenchmarkEventstorePushFilterParallel(b *testing.B) {
 	filter := &zitadel.Filter{
 		Aggregates: []*zitadel.AggregateFilter{
 			{
-				ID: "1",
+				ID:   "1",
+				Type: "testAgg",
+				Events: []*zitadel.EventFilter{
+					{
+						Types: []string{
+							"event.type",
+						},
+					},
+				},
+			},
+			{
+				ID:   "5",
+				Type: "testAgg",
+				Events: []*zitadel.EventFilter{
+					{
+						Types: []string{
+							"event.type",
+						},
+					},
+				},
+			},
+			{
+				ID:   "10",
+				Type: "testAgg",
 			},
 		},
 	}
@@ -330,61 +451,111 @@ func BenchmarkEventstorePushFilterParallel(b *testing.B) {
 		{
 			name: "1 event",
 			cmds: []zitadel.Command{
-				cmd,
+				&testCommand{
+					aggID: "1",
+				},
 			},
 			filter: filter,
 		},
 		{
 			name: "2 events",
 			cmds: []zitadel.Command{
-				cmd,
-				cmd,
+				&testCommand{
+					aggID: "1",
+				},
+				&testCommand{
+					aggID: "2",
+				},
 			},
 			filter: filter,
 		},
 		{
 			name: "3 events",
 			cmds: []zitadel.Command{
-				cmd,
-				cmd,
-				cmd,
+				&testCommand{
+					aggID: "1",
+				},
+				&testCommand{
+					aggID: "2",
+				},
+				&testCommand{
+					aggID: "3",
+				},
 			},
 			filter: filter,
 		},
 		{
 			name: "4 events",
 			cmds: []zitadel.Command{
-				cmd,
-				cmd,
-				cmd,
-				cmd,
+				&testCommand{
+					aggID: "1",
+				},
+				&testCommand{
+					aggID: "2",
+				},
+				&testCommand{
+					aggID: "3",
+				},
+				&testCommand{
+					aggID: "4",
+				},
 			},
 			filter: filter,
 		},
 		{
 			name: "5 event",
 			cmds: []zitadel.Command{
-				cmd,
-				cmd,
-				cmd,
-				cmd,
-				cmd,
+				&testCommand{
+					aggID: "1",
+				},
+				&testCommand{
+					aggID: "2",
+				},
+				&testCommand{
+					aggID: "3",
+				},
+				&testCommand{
+					aggID: "4",
+				},
+				&testCommand{
+					aggID: "5",
+				},
 			},
 			filter: filter,
 		},
 		{
 			name: "10 event",
 			cmds: []zitadel.Command{
-				cmd,
-				cmd,
-				cmd,
-				cmd,
-				cmd,
-				cmd,
-				cmd,
-				cmd,
-				cmd,
-				cmd,
+				&testCommand{
+					aggID: "1",
+				},
+				&testCommand{
+					aggID: "2",
+				},
+				&testCommand{
+					aggID: "3",
+				},
+				&testCommand{
+					aggID: "4",
+				},
+				&testCommand{
+					aggID: "5",
+				},
+				&testCommand{
+					aggID: "6",
+				},
+				&testCommand{
+					aggID: "7",
+				},
+				&testCommand{
+					aggID: "8",
+				},
+				&testCommand{
+					aggID: "9",
+				},
+				&testCommand{
+					aggID: "10",
+				},
 			},
 			filter: filter,
 		},
@@ -429,6 +600,7 @@ func BenchmarkEventstorePushFilterParallel(b *testing.B) {
 		}
 
 		close(cmds)
+		close(filters)
 	}
 }
 
@@ -437,7 +609,7 @@ func filterWorker(b *testing.B, id int, es *zitadel.Eventstore, filters <-chan *
 	for cmd := range filters {
 		cpy := *cmd
 		cpy.Aggregates[0].ID = aggID
-		cpy.CreationDateGreaterEqual = time.Now().Add(-10 * time.Millisecond)
+		cpy.CreationDateLess = time.Now().Add(-2 * time.Millisecond)
 		_, err := es.Filter(context.Background(), &cpy)
 		if err != nil {
 			b.Error(err)
@@ -581,25 +753,25 @@ func createEventstores(f fataler, db *sql.DB) map[string]*zitadel.Eventstore {
 	// if err != nil {
 	// 	f.Fatalf("unable to mock database: %v", err)
 	// }
-	// crdb2_2, err := storage.NewCRDB2_2(db)
-	// if err != nil {
-	// 	f.Fatalf("unable to mock database: %v", err)
-	// }
+	crdb2_2, err := storage.NewCRDB2_2(db)
+	if err != nil {
+		f.Fatalf("unable to mock database: %v", err)
+	}
 	// crdb3, err := storage.NewCRDB3(db)
 	// if err != nil {
 	// 	f.Fatalf("unable to mock database: %v", err)
 	// }
-	crdb4, err := storage.NewCRDB4(db)
-	if err != nil {
-		f.Fatalf("unable to mock database: %v", err)
-	}
+	// crdb4, err := storage.NewCRDB4(db)
+	// if err != nil {
+	// 	f.Fatalf("unable to mock database: %v", err)
+	// }
 
 	return map[string]*zitadel.Eventstore{
 		// "crdb1":   zitadel.NewEventstore(crdb1),
 		// "crdb2":   zitadel.NewEventstore(crdb2),
-		// "crdb2_2": zitadel.NewEventstore(crdb2_2),
+		"crdb2_2": zitadel.NewEventstore(crdb2_2),
 		// "crdb3":   zitadel.NewEventstore(crdb3),
-		"crdb4": zitadel.NewEventstore(crdb4),
+		// "crdb4": zitadel.NewEventstore(crdb4),
 	}
 }
 

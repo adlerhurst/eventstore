@@ -42,7 +42,7 @@ func (crdb *CRDB2_2) Push(ctx context.Context, cmds []zitadel.Command) ([]*zitad
 }
 
 func (crdb *CRDB2_2) Filter(ctx context.Context, filter *zitadel.Filter) ([]*zitadel.Event, error) {
-	query := filterStmt2 + " WHERE "
+	query := filterStmt2
 	clause, args := filterToSQL(filter)
 	query += clause
 

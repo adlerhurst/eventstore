@@ -29,9 +29,10 @@ func filterToSQL(filter *zitadel.Filter) (clause string, args []any) {
 	var argCounter int
 
 	if !filter.CreationDateLess.IsZero() {
-		clause += "AS OF SYSTEM TIME '" + filter.CreationDateLess.Add(1*time.Microsecond).
-			Format(sqlTimeLayout) + "' "
+		clause += " AS OF SYSTEM TIME '" + filter.CreationDateLess.Add(1*time.Microsecond).
+			Format(sqlTimeLayout) + "'"
 	}
+	clause += " WHERE "
 
 	clauses := make([]string, 0, 5)
 	args = make([]any, 0, 5)

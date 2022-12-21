@@ -1,3 +1,4 @@
+// This implementation is too slow, querying 1732 rows using a single filter takes 88ms
 package storage
 
 import (

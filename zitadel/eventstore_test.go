@@ -195,6 +195,23 @@ func BenchmarkEventstorePush(b *testing.B) {
 			},
 		},
 		{
+			name: "instance by host",
+			cmds: []zitadel.Command{
+				&testCommand{
+					aggID: "1",
+				},
+				&testCommand{
+					aggID: "2",
+				},
+				&testCommand{
+					aggID: "3",
+				},
+				&testCommand{
+					aggID: "4",
+				},
+			},
+		},
+		{
 			name: "8000 event",
 			cmds: cmds8000,
 		},
@@ -349,10 +366,6 @@ func BenchmarkEventstorePushParallel(b *testing.B) {
 				},
 			},
 		},
-		// {
-		// 	name: "8000 event",
-		// 	cmds: cmds8000,
-		// },
 	}
 
 	for esKey, es := range eventstores {
@@ -740,6 +753,114 @@ func TestEventstore_Filter(t *testing.T) {
 	}
 }
 
+func TestEventstore_FilterInstanceByDomain(t *testing.T) {
+	db, err := sql.Open("pgx", "postgresql://root@localhost:26257/defaultdb?sslmode=disable")
+	if err != nil {
+		t.Fatal("unable to connect to db")
+	}
+	defer db.Close()
+
+	eventstores := createEventstores(t, db)
+
+	domainPayload := struct {
+		Domain string `json:"domain"`
+	}{"test.domain.cloud"}
+
+	defaults := []zitadel.Command{
+		&testCommand{
+			eventType: "instance.domain.added",
+			payload:   domainPayload,
+			aggID:     "ok",
+		},
+		&testCommand{
+			eventType: "instance.domain.added",
+			payload:   domainPayload,
+			aggID:     "2",
+		},
+		&testCommand{
+			eventType: "instance.domain.removed",
+			payload:   domainPayload,
+			aggID:     "2",
+		},
+		&testCommand{
+			eventType: "instance.domain.added",
+			payload:   domainPayload,
+			aggID:     "1",
+		},
+		&testCommand{
+			eventType: "instance.domain.removed",
+			payload:   domainPayload,
+			aggID:     "1",
+		},
+	}
+
+	type args struct {
+		filter *zitadel.Filter
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    []*zitadel.Event
+		wantErr bool
+	}{
+		{
+			name: "search instance domain",
+			args: args{
+				filter: &zitadel.Filter{
+					Desc: true,
+					Aggregates: []*zitadel.AggregateFilter{
+						{
+							Type: "instance",
+							Events: []*zitadel.EventFilter{
+								{
+									Types: []string{
+										"instance.domain.added",
+										"instance.domain.removed",
+									},
+									Payload: map[string]any{
+										"domain": "test.domain.cloud",
+									},
+								},
+								{
+									Types: []string{
+										"instance.removed",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			want: []*zitadel.Event{
+				nil,
+				nil,
+				nil,
+			},
+			wantErr: false,
+		},
+	}
+	for esKey, es := range eventstores {
+		if _, err := es.Push(context.Background(), defaults); err != nil {
+			t.Fatalf("unable to push default events: %v", err)
+		}
+		for _, tt := range tests {
+			t.Run(fmt.Sprintf("%s %s", esKey, tt.name), func(t *testing.T) {
+				events, err := es.Filter(context.Background(), tt.args.filter)
+				if errors.Is(err, storage.ErrUnimplemented) {
+					return
+				}
+				if (err != nil) != tt.wantErr {
+					t.Errorf("Eventstore.Filter() error = %v, wantErr %v", err, tt.wantErr)
+					return
+				}
+				if len(tt.want) != len(events) {
+					t.Errorf("Eventstore.Filter() expected event count %d, got %d", len(tt.want), len(events))
+				}
+			})
+		}
+	}
+}
+
 type fataler interface {
 	Fatalf(string, ...any)
 }
@@ -761,17 +882,17 @@ func createEventstores(f fataler, db *sql.DB) map[string]*zitadel.Eventstore {
 	// if err != nil {
 	// 	f.Fatalf("unable to mock database: %v", err)
 	// }
-	// crdb4, err := storage.NewCRDB4(db)
-	// if err != nil {
-	// 	f.Fatalf("unable to mock database: %v", err)
-	// }
+	crdb4, err := storage.NewCRDB4(db)
+	if err != nil {
+		f.Fatalf("unable to mock database: %v", err)
+	}
 
 	return map[string]*zitadel.Eventstore{
 		// "crdb1":   zitadel.NewEventstore(crdb1),
 		// "crdb2":   zitadel.NewEventstore(crdb2),
 		"crdb2_2": zitadel.NewEventstore(crdb2_2),
 		// "crdb3":   zitadel.NewEventstore(crdb3),
-		// "crdb4": zitadel.NewEventstore(crdb4),
+		"crdb4": zitadel.NewEventstore(crdb4),
 	}
 }
 
@@ -816,8 +937,9 @@ func createPayloads(f fataler) map[string]interface{} {
 }
 
 type testCommand struct {
-	payload interface{}
-	aggID   string
+	payload   interface{}
+	aggID     string
+	eventType string
 }
 
 func (cmd *testCommand) Aggregate() zitadel.Aggregate {
@@ -838,7 +960,10 @@ func (cmd *testCommand) EditorUser() string {
 }
 
 func (cmd *testCommand) Type() string {
-	return "event.type"
+	if cmd.eventType == "" {
+		return "event.type"
+	}
+	return cmd.eventType
 }
 
 func (cmd *testCommand) Payload() interface{} {

@@ -5,6 +5,7 @@ import (
 	_ "embed"
 	"encoding/json"
 	"errors"
+	"log"
 	"strconv"
 	"strings"
 	"time"
@@ -113,6 +114,9 @@ func eventFiltersToSQL(filters []*zitadel.EventFilter, argCount *int, args []any
 	clauses := make([]string, len(filters))
 	for i, filter := range filters {
 		clauses[i], args = eventFilterToSQL(filter, argCount, args)
+		if len(filters) > 1 {
+			clauses[i] = "(" + clauses[i] + ")"
+		}
 	}
 
 	return strings.Join(clauses, " OR "), args
@@ -121,6 +125,15 @@ func eventFiltersToSQL(filters []*zitadel.EventFilter, argCount *int, args []any
 func eventFilterToSQL(filter *zitadel.EventFilter, argCount *int, args []any) (string, []any) {
 	clause := "event_type = ANY " + arg(argCount)
 	args = append(args, filter.Types)
+
+	if len(filter.Payload) > 0 {
+		clause += " AND payload @> " + arg(argCount)
+		arg, err := json.Marshal(filter.Payload)
+		if err != nil {
+			log.Fatalf("unable to marshal payload: %v", err)
+		}
+		args = append(args, arg)
+	}
 
 	return clause, args
 }

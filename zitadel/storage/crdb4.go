@@ -7,6 +7,7 @@ import (
 	_ "embed"
 	"encoding/json"
 	"fmt"
+	"log"
 	"strconv"
 	"strings"
 	"time"
@@ -320,11 +321,20 @@ func eventsFilter(events []*zitadel.EventFilter, argCounter *int, args []any) (s
 }
 
 func eventFilter(event *zitadel.EventFilter, argCounter *int, args []any) (string, []any) {
-	clauses := make([]string, len(event.Types))
+	clauses := make([]string, len(event.Types), len(event.Types)+len(event.Payload))
 
 	for i, typ := range event.Types {
 		clauses[i] = eventClause(argCounter)
 		args = append(args, eventArg("type", typ))
+	}
+
+	if len(event.Payload) > 0 {
+		clauses = append(clauses, eventClause(argCounter))
+		arg, err := json.Marshal(event.Payload)
+		if err != nil {
+			log.Fatalf("unable to marshal payload: %v", err)
+		}
+		args = append(args, arg)
 	}
 
 	return strings.Join(clauses, " OR "), args

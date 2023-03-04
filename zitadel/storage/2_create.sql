@@ -15,7 +15,7 @@ CREATE TABLE IF NOT EXISTS events2 (
     
     , region TEXT NULL
 
-    , PRIMARY KEY (aggregate_id, aggregate_type, creation_date)
+    , PRIMARY KEY (aggregate_id, creation_date)
     , INVERTED INDEX event_search (aggregate_type, event_type, payload)
     , INDEX (aggregate_id, event_type, aggregate_type, resource_owner)
 );

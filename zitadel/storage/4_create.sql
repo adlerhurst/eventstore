@@ -7,8 +7,4 @@ CREATE TABLE IF NOT EXISTS events4 (
 
     , PRIMARY KEY (aggregate_id, creation_date)
     , INVERTED INDEX search (event)
-    , INVERTED INDEX search_with_cr (creation_date, event)
-    , INVERTED INDEX agg ((event->'aggregate'))
-    , INDEX event_type ((event->>'type'))
-    , INVERTED INDEX payload ((event->'payload'))
 );

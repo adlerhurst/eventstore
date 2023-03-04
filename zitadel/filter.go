@@ -34,13 +34,8 @@ type AggregateFilter struct {
 }
 
 type EventFilter struct {
-	Types StringArray //required
-	// FUTURE: Payload map[string]any
-}
-
-func validateFilter(f *Filter) error {
-
-	return nil
+	Types   StringArray //required
+	Payload map[string]any
 }
 
 type StringArray []string

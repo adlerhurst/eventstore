@@ -1,48 +1,34 @@
 package memory
 
 import (
-	"github.com/adlerhurst/eventstore"
-	"github.com/adlerhurst/eventstore/storage"
+	"encoding/json"
+	"time"
+
+	"github.com/adlerhurst/eventstore/v0"
 )
 
-type events []*event
-
-// event implements a linked list
-// the aim is to iterate throug events based on the sequence
-type event struct {
-	eventstore.EventBase
+// Event implements [eventstore.Event]
+type Event struct {
+	eventstore.Command
+	sequence     uint64
+	creationDate time.Time
+	payload      []byte
 }
 
-func NewEvent(cmd eventstore.Command, seq uint64) (*event, error) {
-	payload, err := storage.PayloadToBytes(cmd.Payload())
-	if err != nil {
-		return nil, err
+// Sequence implements [eventstore.Event]
+func (e *Event) Sequence() uint64 {
+	return e.sequence
+}
+
+// CreationDate implements [eventstore.Event]
+func (e *Event) CreationDate() time.Time {
+	return e.creationDate
+}
+
+// UnmarshalPayload implements [eventstore.Event]
+func (e *Event) UnmarshalPayload(object interface{}) error {
+	if len(e.payload) == 0 {
+		return nil
 	}
-	return &event{
-		EventBase: eventstore.EventBase{
-			EditorService: cmd.EditorService(),
-			EditorUser:    cmd.EditorUser(),
-			Subjects:      cmd.Subjects(),
-			Payload:       payload,
-			Sequence:      seq,
-			ResourceOwner: cmd.ResourceOwner(),
-		},
-	}, nil
+	return json.Unmarshal(e.payload, object)
 }
-
-func (e *event) toEventstore() eventstore.EventBase {
-	return eventstore.EventBase{
-		EditorService: e.EditorService,
-		EditorUser:    e.EditorUser,
-		ResourceOwner: e.ResourceOwner,
-		Payload:       e.Payload,
-		Subjects:      e.Subjects,
-		Sequence:      e.Sequence,
-	}
-}
-
-func (a events) Len() int { return len(a) }
-
-func (a events) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
-
-func (a events) Less(i, j int) bool { return a[i].Sequence < a[j].Sequence }

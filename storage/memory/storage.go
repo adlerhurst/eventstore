@@ -2,77 +2,125 @@ package memory
 
 import (
 	"context"
-	"sync"
+	"encoding/json"
+	"time"
 
-	"github.com/adlerhurst/eventstore"
+	"github.com/adlerhurst/eventstore/v0"
 )
 
-type Storage struct {
-	sequence uint64
-	mu       sync.Mutex
-	root     *subject
-}
-
+// New is the constructor
 func New() *Storage {
 	return &Storage{
-		root: &subject{},
+		events:            make([]*Event, 0),
+		aggregateSequence: make(map[string]uint64),
 	}
 }
 
-//Health checks if the storage is available
+var _ eventstore.Eventstore = (*Storage)(nil)
+
+// Push implements [eventstore.Eventstore]
+type Storage struct {
+	events            []*Event
+	aggregateSequence map[string]uint64
+}
+
+// Ready implements [eventstore.Eventstore]
 func (s *Storage) Ready(context.Context) error { return nil }
 
-// Push stores the command's and returns the resulting Event's
-// the command's should be stored in a single transaction
-func (s *Storage) Push(_ context.Context, cmds []eventstore.Command) (storedEvents []eventstore.EventBase, err error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	toPush := make(events, len(cmds))
-	storedEvents = make([]eventstore.EventBase, len(cmds))
-	seq := s.sequence
-	for i, cmd := range cmds {
-		seq++
-		toPush[i], err = NewEvent(cmd, seq)
-		if err != nil {
-			return nil, err
+// Push implements [eventstore.Eventstore]
+func (s *Storage) Push(ctx context.Context, commands ...eventstore.Command) (_ []eventstore.Event, err error) {
+	events := make([]*Event, len(commands))
+	response := make([]eventstore.Event, len(commands))
+	for i, command := range commands {
+		var payload []byte
+		if command.Payload() != nil {
+			payload, err = json.Marshal(command.Payload())
+			if err != nil {
+				return nil, err
+			}
 		}
-		storedEvents[i] = toPush[i].toEventstore()
+		aggregate := command.Aggregate().Join(".")
+		if _, ok := s.aggregateSequence[aggregate]; !ok {
+			s.aggregateSequence[aggregate] = 0
+		}
+		s.aggregateSequence[aggregate]++
+
+		events[i] = &Event{
+			Command:      command,
+			sequence:     s.aggregateSequence[aggregate],
+			creationDate: time.Now(),
+			payload:      payload,
+		}
+
+		response[i] = events[i]
 	}
 
-	for _, e := range toPush {
-		s.root.push(e.Subjects, e)
-	}
+	s.events = append(s.events, events...)
 
-	s.sequence = seq
-	return storedEvents, nil
+	return response, nil
 }
 
-//Filter returns the events matching the subject
-func (s *Storage) Filter(_ context.Context, filter eventstore.Filter) (res []eventstore.EventBase, _ error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	//needed because in the current implementation the base subject has no subject
-	filter.Subjects = append([]eventstore.Subject{eventstore.SingleToken}, filter.Subjects...)
+// Filter implements [eventstore.Eventstore]
+func (s *Storage) Filter(ctx context.Context, filter *eventstore.Filter) ([]eventstore.Event, error) {
+	events := make([]eventstore.Event, 0, filter.Limit)
 
-	res = make([]eventstore.EventBase, 0, filter.Limit)
+	for _, event := range s.events {
+		if filter.Limit > 0 && len(events) == int(filter.Limit) {
+			break
+		}
 
-	found := s.root.find(filter.Subjects)
-	for _, e := range found {
-
-		if filter.From > 0 && e.Sequence < filter.From {
+		if !checkFrom(filter.From, event) ||
+			!checkTo(filter.To, event) ||
+			!checkAction(filter.Action, event) {
 			continue
 		}
-		if filter.To > 0 && e.Sequence > filter.To {
-			break
-		}
 
-		res = append(res, e.toEventstore())
+		events = append(events, event)
+	}
 
-		if uint64(len(res)) == filter.Limit {
-			break
+	return events, nil
+}
+
+func checkFrom(from uint64, event *Event) bool {
+	if from == 0 {
+		return true
+	}
+	return event.sequence > from
+}
+
+func checkTo(to uint64, event *Event) bool {
+	if to == 0 {
+		return true
+	}
+	return event.sequence < to
+}
+
+func checkAction(action []eventstore.Subject, event *Event) bool {
+	// if len(action) != len(event.Action()) {
+	// 	return action[len(action)-1] == eventstore.MultiToken
+	// }
+	for i, a := range action {
+		switch a {
+		case eventstore.SingleToken:
+			if i > len(event.Action())-1 {
+				return false
+			}
+			continue
+		case eventstore.MultiToken:
+			if i > len(event.Action())-1 {
+				return false
+			}
+			return true
+		default:
+			if i > len(event.Action())-1 {
+				return false
+			}
+			// must have type [eventstore.TextSubject] and therefore match
+			if a.(eventstore.TextSubject) != event.Action()[i] {
+				return false
+			}
 		}
 	}
 
-	return res, nil
+	return true
 }

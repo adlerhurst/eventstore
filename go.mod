@@ -1,3 +1,3 @@
-module github.com/adlerhurst/eventstore
+module github.com/adlerhurst/eventstore/v0
 
-go 1.17
+go 1.20

@@ -6,9 +6,10 @@ import (
 	"reflect"
 	"strconv"
 	"testing"
+	"time"
 
-	"github.com/adlerhurst/eventstore"
-	"github.com/adlerhurst/eventstore/storage/memory"
+	. "github.com/adlerhurst/eventstore/v0"
+	"github.com/adlerhurst/eventstore/v0/storage/memory"
 )
 
 type testUser struct {
@@ -34,26 +35,60 @@ func (u testUser) toAdded() *testUserAdded {
 	}
 }
 
-type testUserAdded struct {
-	eventstore.EventBase `json:"-"`
+var (
+	_ Command = (*testUserAdded)(nil)
+	_ Event   = (*testUserAdded)(nil)
+)
 
+type testUserAdded struct {
 	id        string
 	FirstName string `json:"firstName,omitempty"`
 	LastName  string `json:"lastName,omitempty"`
 	Username  string `json:"username,omitempty"`
 }
 
-func (e *testUserAdded) EditorService() string { return "svc" }
-
-func (e *testUserAdded) EditorUser() string { return "usr" }
-
-func (e *testUserAdded) Subjects() []eventstore.TextSubject {
-	return []eventstore.TextSubject{"user", eventstore.TextSubject(e.id), "added"}
+// Action implements [eventstore.Action]
+func (e *testUserAdded) Action() TextSubjects {
+	return []TextSubject{"user", TextSubject(e.id), "added"}
 }
 
-func (e *testUserAdded) ResourceOwner() string { return "ro" }
+// Aggregate implements [eventstore.Action]
+func (e *testUserAdded) Aggregate() TextSubjects {
+	return []TextSubject{"user", TextSubject(e.id)}
+}
 
+// Metadata implements [eventstore.Action]
+func (*testUserAdded) Metadata() map[string]interface{} {
+	return map[string]interface{}{
+		"editorService": "svc",
+		"editorUser":    "usr",
+		"resourceOwner": "ro",
+	}
+}
+
+// Revision implements [eventstore.Action]
+func (*testUserAdded) Revision() uint16 { return 1 }
+
+// Payload implements [eventstore.Command]
 func (e *testUserAdded) Payload() interface{} { return e }
+
+// Options implements [eventstore.Command]
+func (e *testUserAdded) Options() []func(Command) error { return nil }
+
+// Sequence implements [eventstore.Event]
+func (e *testUserAdded) Sequence() uint64 { return 0 }
+
+// CreationDate implements [eventstore.Event]
+func (e *testUserAdded) CreationDate() time.Time { return time.Time{} }
+
+// UnmarshalPayload implements [eventstore.Event]
+func (e *testUserAdded) UnmarshalPayload(object interface{}) error {
+	data, err := json.Marshal(e)
+	if err != nil {
+		return err
+	}
+	return json.Unmarshal(data, object)
+}
 
 func (u testUser) toFirstNameChanged() *testUserFirstNameChanged {
 	return &testUserFirstNameChanged{
@@ -62,24 +97,55 @@ func (u testUser) toFirstNameChanged() *testUserFirstNameChanged {
 	}
 }
 
-type testUserFirstNameChanged struct {
-	eventstore.EventBase `json:"-"`
+var _ Command = (*testUserFirstNameChanged)(nil)
 
+type testUserFirstNameChanged struct {
 	id        string
 	FirstName string `json:"firstName,omitempty"`
 }
 
-func (e *testUserFirstNameChanged) EditorService() string { return "svc" }
-
-func (e *testUserFirstNameChanged) EditorUser() string { return "usr" }
-
-func (e *testUserFirstNameChanged) Subjects() []eventstore.TextSubject {
-	return []eventstore.TextSubject{"user", eventstore.TextSubject(e.id), "changed", "firstName"}
+// Action implements [eventstore.Action]
+func (e *testUserFirstNameChanged) Action() TextSubjects {
+	return []TextSubject{"user", TextSubject(e.id), "changed", "firstName"}
 }
 
-func (e *testUserFirstNameChanged) ResourceOwner() string { return "ro" }
+// Aggregate implements [eventstore.Action]
+func (e *testUserFirstNameChanged) Aggregate() TextSubjects {
+	return []TextSubject{"user", TextSubject(e.id)}
+}
 
+// Metadata implements [eventstore.Action]
+func (*testUserFirstNameChanged) Metadata() map[string]interface{} {
+	return map[string]interface{}{
+		"editorService": "svc",
+		"editorUser":    "usr",
+		"resourceOwner": "ro",
+	}
+}
+
+// Revision implements [eventstore.Action]
+func (*testUserFirstNameChanged) Revision() uint16 { return 1 }
+
+// Payload implements [eventstore.Command]
 func (e *testUserFirstNameChanged) Payload() interface{} { return e }
+
+// Options implements [eventstore.Command]
+func (e *testUserFirstNameChanged) Options() []func(Command) error { return nil }
+
+// Sequence implements [eventstore.Event]
+func (e *testUserFirstNameChanged) Sequence() uint64 { return 0 }
+
+// CreationDate implements [eventstore.Event]
+func (e *testUserFirstNameChanged) CreationDate() time.Time { return time.Time{} }
+
+// UnmarshalPayload implements [eventstore.Event]
+func (e *testUserFirstNameChanged) UnmarshalPayload(object interface{}) error {
+	data, err := json.Marshal(e)
+	if err != nil {
+		return err
+	}
+	return json.Unmarshal(data, object)
+}
 
 func (u testUser) toLastNameChanged() *testUserLastNameChanged {
 	return &testUserLastNameChanged{
@@ -88,24 +154,55 @@ func (u testUser) toLastNameChanged() *testUserLastNameChanged {
 	}
 }
 
-type testUserLastNameChanged struct {
-	eventstore.EventBase `json:"-"`
+var _ Command = (*testUserLastNameChanged)(nil)
 
+type testUserLastNameChanged struct {
 	id       string
 	LastName string `json:"lastName,omitempty"`
 }
 
-func (e *testUserLastNameChanged) EditorService() string { return "svc" }
-
-func (e *testUserLastNameChanged) EditorUser() string { return "usr" }
-
-func (e *testUserLastNameChanged) Subjects() []eventstore.TextSubject {
-	return []eventstore.TextSubject{"user", eventstore.TextSubject(e.id), "changed", "lastName"}
+// Action implements [eventstore.Action]
+func (e *testUserLastNameChanged) Action() TextSubjects {
+	return []TextSubject{"user", TextSubject(e.id), "changed", "lastName"}
 }
 
-func (e *testUserLastNameChanged) ResourceOwner() string { return "ro" }
+// Aggregate implements [eventstore.Action]
+func (e *testUserLastNameChanged) Aggregate() TextSubjects {
+	return []TextSubject{"user", TextSubject(e.id)}
+}
 
+// Metadata implements [eventstore.Action]
+func (*testUserLastNameChanged) Metadata() map[string]interface{} {
+	return map[string]interface{}{
+		"editorService": "svc",
+		"editorUser":    "usr",
+		"resourceOwner": "ro",
+	}
+}
+
+// Revision implements [eventstore.Action]
+func (*testUserLastNameChanged) Revision() uint16 { return 1 }
+
+// Payload implements [eventstore.Command]
 func (e *testUserLastNameChanged) Payload() interface{} { return e }
+
+// Options implements [eventstore.Command]
+func (e *testUserLastNameChanged) Options() []func(Command) error { return nil }
+
+// Sequence implements [eventstore.Event]
+func (e *testUserLastNameChanged) Sequence() uint64 { return 0 }
+
+// CreationDate implements [eventstore.Event]
+func (e *testUserLastNameChanged) CreationDate() time.Time { return time.Time{} }
+
+// UnmarshalPayload implements [eventstore.Event]
+func (e *testUserLastNameChanged) UnmarshalPayload(object interface{}) error {
+	data, err := json.Marshal(e)
+	if err != nil {
+		return err
+	}
+	return json.Unmarshal(data, object)
+}
 
 func (u testUser) toUsernameChanged() *testUsernameChanged {
 	return &testUsernameChanged{
@@ -114,24 +211,55 @@ func (u testUser) toUsernameChanged() *testUsernameChanged {
 	}
 }
 
-type testUsernameChanged struct {
-	eventstore.EventBase `json:"-"`
+var _ Command = (*testUsernameChanged)(nil)
 
+type testUsernameChanged struct {
 	id       string
 	Username string `json:"username,omitempty"`
 }
 
-func (e *testUsernameChanged) EditorService() string { return "svc" }
-
-func (e *testUsernameChanged) EditorUser() string { return "usr" }
-
-func (e *testUsernameChanged) Subjects() []eventstore.TextSubject {
-	return []eventstore.TextSubject{"user", eventstore.TextSubject(e.id), "changed", "username"}
+// Action implements [eventstore.Action]
+func (e *testUsernameChanged) Action() TextSubjects {
+	return []TextSubject{"user", TextSubject(e.id), "changed", "username"}
 }
 
-func (e *testUsernameChanged) ResourceOwner() string { return "ro" }
+// Aggregate implements [eventstore.Action]
+func (e *testUsernameChanged) Aggregate() TextSubjects {
+	return []TextSubject{"user", TextSubject(e.id)}
+}
 
+// Metadata implements [eventstore.Action]
+func (*testUsernameChanged) Metadata() map[string]interface{} {
+	return map[string]interface{}{
+		"editorService": "svc",
+		"editorUser":    "usr",
+		"resourceOwner": "ro",
+	}
+}
+
+// Revision implements [eventstore.Action]
+func (*testUsernameChanged) Revision() uint16 { return 1 }
+
+// Payload implements [eventstore.Command]
 func (e *testUsernameChanged) Payload() interface{} { return e }
+
+// Options implements [eventstore.Command]
+func (e *testUsernameChanged) Options() []func(Command) error { return nil }
+
+// Sequence implements [eventstore.Event]
+func (e *testUsernameChanged) Sequence() uint64 { return 0 }
+
+// CreationDate implements [eventstore.Event]
+func (e *testUsernameChanged) CreationDate() time.Time { return time.Time{} }
+
+// UnmarshalPayload implements [eventstore.Event]
+func (e *testUsernameChanged) UnmarshalPayload(object interface{}) error {
+	data, err := json.Marshal(e)
+	if err != nil {
+		return err
+	}
+	return json.Unmarshal(data, object)
+}
 
 func (u testUser) toRemoved() *testUserRemoved {
 	return &testUserRemoved{
@@ -139,36 +267,67 @@ func (u testUser) toRemoved() *testUserRemoved {
 	}
 }
 
-type testUserRemoved struct {
-	eventstore.EventBase `json:"-"`
+var _ Command = (*testUserRemoved)(nil)
 
+type testUserRemoved struct {
 	id string
 }
 
-func (e *testUserRemoved) EditorService() string { return "svc" }
-
-func (e *testUserRemoved) EditorUser() string { return "usr" }
-
-func (e *testUserRemoved) Subjects() []eventstore.TextSubject {
-	return []eventstore.TextSubject{"user", eventstore.TextSubject(e.id), "removed"}
+// Action implements [eventstore.Action]
+func (e *testUserRemoved) Action() TextSubjects {
+	return []TextSubject{"user", TextSubject(e.id), "removed"}
 }
 
-func (e *testUserRemoved) ResourceOwner() string { return "ro" }
+// Aggregate implements [eventstore.Action]
+func (e *testUserRemoved) Aggregate() TextSubjects {
+	return []TextSubject{"user", TextSubject(e.id)}
+}
 
+// Metadata implements [eventstore.Action]
+func (*testUserRemoved) Metadata() map[string]interface{} {
+	return map[string]interface{}{
+		"editorService": "svc",
+		"editorUser":    "usr",
+		"resourceOwner": "ro",
+	}
+}
+
+// Revision implements [eventstore.Action]
+func (*testUserRemoved) Revision() uint16 { return 1 }
+
+// Payload implements [eventstore.Command]
 func (e *testUserRemoved) Payload() interface{} { return nil }
+
+// Options implements [eventstore.Command]
+func (e *testUserRemoved) Options() []func(Command) error { return nil }
+
+// Sequence implements [eventstore.Event]
+func (e *testUserRemoved) Sequence() uint64 { return 0 }
+
+// CreationDate implements [eventstore.Event]
+func (e *testUserRemoved) CreationDate() time.Time { return time.Time{} }
+
+// UnmarshalPayload implements [eventstore.Event]
+func (e *testUserRemoved) UnmarshalPayload(object interface{}) error {
+	object = nil
+	return nil
+}
 
 func TestEventstore_Push(t *testing.T) {
 	type fields struct {
-		storage eventstore.Storage
+		storage Eventstore
 	}
 	type args struct {
-		commands []eventstore.Command
+		commands []Command
 	}
+	user := new(testUser)
+	*user = *defaultTestUser
+	user.id = "2"
 	tests := []struct {
 		name    string
 		fields  fields
 		args    args
-		want    []eventstore.EventBase
+		want    []Event
 		wantErr bool
 	}{
 		{
@@ -177,44 +336,51 @@ func TestEventstore_Push(t *testing.T) {
 				storage: memory.New(),
 			},
 			args: args{
-				commands: []eventstore.Command{
+				commands: []Command{
 					defaultTestUser.toAdded(),
 					defaultTestUser.toRemoved(),
 				},
 			},
-			want: []eventstore.EventBase{
-				{
-					EditorService: "svc",
-					EditorUser:    "usr",
-					ResourceOwner: "ro",
-					Subjects:      []eventstore.TextSubject{"user", "id", "added"},
-					Sequence:      1,
-					Payload:       mustJSON(t, defaultTestUser.toAdded()),
+			want: []Event{
+				defaultTestUser.toAdded(),
+				defaultTestUser.toRemoved(),
+			},
+			wantErr: false,
+		},
+		{
+			name: "multiple aggregates",
+			fields: fields{
+				storage: memory.New(),
+			},
+			args: args{
+				commands: []Command{
+					defaultTestUser.toAdded(),
+					user.toAdded(),
+					defaultTestUser.toUsernameChanged(),
+					user.toFirstNameChanged(),
+					user.toLastNameChanged(),
+					defaultTestUser.toRemoved(),
 				},
-				{
-					EditorService: "svc",
-					EditorUser:    "usr",
-					ResourceOwner: "ro",
-					Subjects:      []eventstore.TextSubject{"user", "id", "removed"},
-					Sequence:      2,
-				},
+			},
+			want: []Event{
+				defaultTestUser.toAdded(),
+				user.toAdded(),
+				defaultTestUser.toUsernameChanged(),
+				user.toFirstNameChanged(),
+				user.toLastNameChanged(),
+				defaultTestUser.toRemoved(),
 			},
 			wantErr: false,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			es := eventstore.New(tt.fields.storage)
-			got, err := es.Push(context.Background(), tt.args.commands...)
+			got, err := tt.fields.storage.Push(context.Background(), tt.args.commands...)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Eventstore.Push() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			for i, wanted := range tt.want {
-				if !reflect.DeepEqual(got[i], wanted) {
-					t.Errorf("Eventstore.Push() %d = %v, want %v", i, got[i], wanted)
-				}
-			}
+			assertEvents(t, tt.want, got)
 		})
 	}
 }
@@ -222,7 +388,7 @@ func TestEventstore_Push(t *testing.T) {
 func BenchmarkEventstorePush(b *testing.B) {
 	tests := []struct {
 		name    string
-		storage eventstore.Storage
+		storage Eventstore
 	}{
 		{
 			name:    "memory",
@@ -231,16 +397,15 @@ func BenchmarkEventstorePush(b *testing.B) {
 	}
 	for _, tt := range tests {
 		b.Run(tt.name, func(b *testing.B) {
-			es := eventstore.New(tt.storage)
 			for n := 0; n < b.N; n++ {
 				user := new(testUser)
 				*user = *defaultTestUser
 				user.id = strconv.Itoa(n)
-				cmds := []eventstore.Command{
+				cmds := []Command{
 					user.toAdded(),
 					user.toRemoved(),
 				}
-				_, err := es.Push(context.Background(), cmds...)
+				_, err := tt.storage.Push(context.Background(), cmds...)
 				if err != nil {
 					b.Error(err)
 				}
@@ -251,74 +416,84 @@ func BenchmarkEventstorePush(b *testing.B) {
 
 func TestEventstore_Filter(t *testing.T) {
 	type fields struct {
-		storage eventstore.Storage
+		storage Eventstore
 	}
 	type args struct {
-		filter eventstore.Filter
+		filter *Filter
 	}
 	tests := []struct {
 		name    string
 		fields  fields
 		args    args
-		want    []eventstore.EventBase
+		want    []Event
 		wantErr bool
 	}{
 		{
-			name: "multiple events",
+			name: "multi token",
 			fields: fields{
 				storage: memory.New(),
 			},
 			args: args{
-				filter: eventstore.Filter{
-					Subjects: []eventstore.Subject{eventstore.TextSubject("user"), eventstore.TextSubject("id"), eventstore.MultiToken},
+				filter: &Filter{
+					Action: []Subject{TextSubject("user"), TextSubject("id"), MultiToken},
 				},
 			},
-			want: []eventstore.EventBase{
-				{
-					EditorService: "svc",
-					EditorUser:    "usr",
-					ResourceOwner: "ro",
-					Subjects:      []eventstore.TextSubject{"user", "id", "added"},
-					Sequence:      1,
-					Payload:       mustJSON(t, defaultTestUser.toAdded()),
+			want: []Event{
+				defaultTestUser.toAdded(),
+				defaultTestUser.toRemoved(),
+			},
+			wantErr: false,
+		},
+		{
+			name: "multiple single tokens",
+			fields: fields{
+				storage: memory.New(),
+			},
+			args: args{
+				filter: &Filter{
+					Action: []Subject{TextSubject("user"), SingleToken, SingleToken},
 				},
-				{
-					EditorService: "svc",
-					EditorUser:    "usr",
-					ResourceOwner: "ro",
-					Subjects:      []eventstore.TextSubject{"user", "id", "removed"},
-					Sequence:      2,
+			},
+			want: []Event{
+				defaultTestUser.toAdded(),
+				defaultTestUser.toRemoved(),
+			},
+			wantErr: false,
+		},
+		{
+			name: "all",
+			fields: fields{
+				storage: memory.New(),
+			},
+			args: args{
+				filter: &Filter{
+					Action: []Subject{MultiToken},
 				},
+			},
+			want: []Event{
+				defaultTestUser.toAdded(),
+				defaultTestUser.toRemoved(),
 			},
 			wantErr: false,
 		},
 	}
 	for _, tt := range tests {
 		ctx := context.Background()
-		cmds := []eventstore.Command{
+		cmds := []Command{
 			defaultTestUser.toAdded(),
 			defaultTestUser.toRemoved(),
 		}
 		t.Run(tt.name, func(t *testing.T) {
-			es := eventstore.New(tt.fields.storage)
-			_, err := es.Push(ctx, cmds...)
+			_, err := tt.fields.storage.Push(ctx, cmds...)
 			if err != nil {
 				t.Fatalf("unable to push events: %v", err)
 			}
-			got, err := es.Filter(ctx, tt.args.filter)
+			got, err := tt.fields.storage.Filter(ctx, tt.args.filter)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Eventstore.Filter() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			if len(tt.want) != len(got) {
-				t.Errorf("unexpected length of filtered events want %d, got %d", len(tt.want), len(got))
-				return
-			}
-			for i, wanted := range tt.want {
-				if !reflect.DeepEqual(got[i], wanted) {
-					t.Errorf("Eventstore.Filter() %d = %v, want %v", i, got[i], wanted)
-				}
-			}
+			assertEvents(t, tt.want, got)
 		})
 	}
 }
@@ -326,7 +501,7 @@ func TestEventstore_Filter(t *testing.T) {
 func BenchmarkEventstoreFilter(b *testing.B) {
 	tests := []struct {
 		name    string
-		storage eventstore.Storage
+		storage Eventstore
 	}{
 		{
 			name:    "memory",
@@ -335,43 +510,165 @@ func BenchmarkEventstoreFilter(b *testing.B) {
 	}
 	for _, tt := range tests {
 		b.Run(tt.name, func(b *testing.B) {
-			es := eventstore.New(tt.storage)
 			user := new(testUser)
 			*user = *defaultTestUser
 			user.id = "2"
-			cmds := []eventstore.Command{
+			cmds := []Command{
 				user.toAdded(),
 				defaultTestUser.toAdded(),
 				defaultTestUser.toRemoved(),
 				user.toRemoved(),
 			}
-			_, err := es.Push(context.Background(), cmds...)
+			_, err := tt.storage.Push(context.Background(), cmds...)
 			if err != nil {
 				b.Error(err)
 				b.FailNow()
 			}
 			for n := 0; n < b.N; n++ {
-				events, err := es.Filter(context.Background(), eventstore.Filter{
-					From:     1,
-					Limit:    2,
-					Subjects: []eventstore.Subject{eventstore.TextSubject("user"), eventstore.SingleToken, eventstore.TextSubject("added")},
+				events, err := tt.storage.Filter(context.Background(), &Filter{
+					From:   0,
+					Limit:  2,
+					Action: []Subject{TextSubject("user"), SingleToken, TextSubject("added")},
 				})
 				if err != nil {
 					b.Error(err)
 				}
 				if len(events) != 2 {
-					b.Errorf("%d: 2 events should be returned got %d", n, len(events))
+					b.Errorf("2 events should be returned got %d", len(events))
 				}
 			}
 		})
 	}
 }
 
-func mustJSON(t *testing.T, object interface{}) []byte {
+func assertEvents(t *testing.T, want, got []Event) (failed bool) {
 	t.Helper()
-	data, err := json.Marshal(object)
-	if err != nil {
-		t.Fatal(err)
+
+	if len(want) != len(got) {
+		t.Errorf("unexpected amount of events. want %d, got %d", len(want), len(got))
+		return true
 	}
-	return data
+
+	for i := 0; i < len(want); i++ {
+		failed = failed || assertEvent(t, want[i], got[i])
+	}
+
+	return failed
 }
+
+func assertEvent(t *testing.T, want, got Event) (failed bool) {
+	t.Helper()
+
+	failed = assertAction(t, want, got)
+	failed = failed || assertPayload(t, want, got)
+
+	if want.Sequence() > 0 && want.Sequence() != got.Sequence() {
+		failed = true
+		t.Errorf("expected sequence %d got: %d", want.Sequence(), got.Sequence())
+	}
+	if !want.CreationDate().IsZero() && !want.CreationDate().Equal(got.CreationDate()) {
+		failed = true
+		t.Errorf("expected creation date %v got: %v", want.CreationDate(), got.CreationDate())
+	}
+
+	return failed
+}
+
+func assertAction(t *testing.T, want, got Action) (failed bool) {
+	t.Helper()
+
+	if !reflect.DeepEqual(want.Action(), got.Action()) {
+		t.Errorf("expected action %q got: %q", want.Action().Join("."), got.Action().Join("."))
+		failed = true
+	}
+	if !reflect.DeepEqual(want.Aggregate(), got.Aggregate()) {
+		t.Errorf("expected aggregate %q got: %q", want.Aggregate().Join("."), got.Aggregate().Join("."))
+		failed = true
+	}
+	if want.Revision() > 0 && want.Revision() != got.Revision() {
+		t.Errorf("expected revision %d got: %d", want.Revision(), got.Revision())
+		failed = true
+	}
+	if !reflect.DeepEqual(want.Metadata(), got.Metadata()) {
+		t.Errorf("expected metadata %v got: %v", want.Metadata(), got.Metadata())
+		failed = true
+	}
+
+	return failed
+}
+
+func assertPayload(t *testing.T, want, got Event) (failed bool) {
+	var (
+		gotPayload, wantPayload interface{}
+	)
+	if err := want.UnmarshalPayload(&wantPayload); err != nil {
+		t.Errorf("unable to unmarshal want payload: %v", err)
+		failed = true
+	}
+	if err := got.UnmarshalPayload(&gotPayload); err != nil {
+		t.Errorf("unable to unmarshal gotten payload: %v", err)
+		failed = true
+	}
+	if !reflect.DeepEqual(gotPayload, wantPayload) {
+		t.Errorf("payload not equal want: %#v got: %#v", wantPayload, gotPayload)
+		failed = true
+	}
+
+	return failed
+}
+
+// func assertCommands(t *testing.T, want, got []Command) (failed bool) {
+// 	t.Helper()
+
+// 	if len(want) != len(got) {
+// 		t.Errorf("unexpected amount of commands. want %d, got %d", len(want), len(got))
+// 		return true
+// 	}
+
+// 	for i := 0; i < len(want); i++ {
+// 		failed = failed || assertCommand(t, want[i], got[i])
+// 	}
+
+// 	return failed
+// }
+
+// func assertCommand(t *testing.T, want, got Command) (failed bool) {
+// 	t.Helper()
+
+// 	failed = assertAction(t, want, got)
+// 	failed = failed || assertCommandOption(t, want.Options(), got.Options())
+
+// 	if !reflect.DeepEqual(want.Payload(), got.Payload()) {
+// 		failed = true
+// 		t.Errorf("expected payload %#v got: %#v", want.Payload(), got.Payload())
+// 	}
+
+// 	return failed
+// }
+
+// func assertCommandOption(t *testing.T, want, got []func(Command) error) (failed bool) {
+// 	t.Helper()
+
+// 	if len(want) != len(got) {
+// 		t.Errorf("unequal length of options: want %d, got %d", len(want), len(got))
+// 		return true
+// 	}
+// 	var gotCmd, wantCmd Command
+// 	for i := 0; i < len(want); i++ {
+// 		if err := want[i](wantCmd); err != nil {
+// 			t.Errorf("wanted option %d failed: %v", i, err)
+// 			failed = true
+// 		}
+// 		if err := got[i](gotCmd); err != nil {
+// 			t.Errorf("gotten option %d failed: %v", i, err)
+// 			failed = true
+// 		}
+// 	}
+
+// 	if !reflect.DeepEqual(gotCmd, wantCmd) {
+// 		t.Errorf("commands unequal after options: want %#v, got: %#v", wantCmd, gotCmd)
+// 		failed = true
+// 	}
+
+// 	return failed
+// }

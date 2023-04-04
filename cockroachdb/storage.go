@@ -3,6 +3,7 @@ package cockroachdb
 import (
 	"context"
 	_ "embed"
+	"fmt"
 
 	"github.com/adlerhurst/eventstore/v0"
 	"github.com/jackc/pgx/v5"
@@ -57,6 +58,10 @@ func (crdb *CockroachDB) Push(ctx context.Context, commands ...eventstore.Comman
 			event.metadata,
 			event.payload,
 		)
+		if err = row.Scan(&event.sequence, &event.creationDate); err != nil {
+			tx.Rollback(ctx)
+			return nil, fmt.Errorf("push failed: %w", err)
+		}
 
 		result[i] = event
 	}

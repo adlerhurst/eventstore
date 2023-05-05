@@ -67,12 +67,22 @@ type Event interface {
 
 // Filter represents a query
 type Filter struct {
-	// From represents the lowest sequence
-	From uint64
-	// To represents the highest sequence
-	To uint64
+	// Sequence filters the sequences of all the actions
+	Sequence SequenceFilter
+	// CreatedAt filters the time and event was created
+	CreatedAt CreatedAtFilter
 	// Limit represents the maximum events returned
 	Limit uint64
 	// Action represents the event type
 	Action []Subject
+}
+
+type SequenceFilter struct {
+	From uint64
+	To   uint64
+}
+
+type CreatedAtFilter struct {
+	From time.Time
+	To   time.Time
 }

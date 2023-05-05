@@ -20,17 +20,17 @@ type Event struct {
 	payload      []byte
 }
 
-// Action implements eventstore.Event
+// Action implements [eventstore.Event]
 func (e *Event) Action() eventstore.TextSubjects {
 	return e.action
 }
 
-// Aggregate implements eventstore.Event
+// Aggregate implements [eventstore.Event]
 func (e *Event) Aggregate() eventstore.TextSubjects {
 	return e.aggregate
 }
 
-// Metadata implements eventstore.Event
+// Metadata implements [eventstore.Event]
 func (e *Event) Metadata() map[string]interface{} {
 	if len(e.metadata) == 0 {
 		return nil
@@ -42,22 +42,22 @@ func (e *Event) Metadata() map[string]interface{} {
 	return metadata
 }
 
-// Revision implements eventstore.Event
+// Revision implements [eventstore.Event]
 func (e *Event) Revision() uint16 {
 	return e.revision
 }
 
-// CreationDate implements eventstore.Event
+// CreationDate implements [eventstore.Event]
 func (e *Event) CreationDate() time.Time {
 	return e.creationDate
 }
 
-// Sequence implements eventstore.Event
+// Sequence implements [eventstore.Event]
 func (e *Event) Sequence() uint64 {
 	return uint64(e.sequence)
 }
 
-// UnmarshalPayload implements eventstore.Event
+// UnmarshalPayload implements [eventstore.Event]
 func (e *Event) UnmarshalPayload(object interface{}) error {
 	if len(e.payload) == 0 {
 		return nil

@@ -1,15 +1,21 @@
-package eventstore_test
+package eventstore
 
 import (
+	// "context"
 	"context"
 	"encoding/json"
-	"reflect"
 	"strconv"
+
+	// "fmt"
+	"reflect"
+	// "strconv"
 	"testing"
 	"time"
-
-	. "github.com/adlerhurst/eventstore/v0"
-	"github.com/adlerhurst/eventstore/v0/storage/memory"
+	// "github.com/cockroachdb/cockroach-go/v2/testserver"
+	// "github.com/jackc/pgx/v5/pgxpool"
+	// . "github.com/adlerhurst/eventstore/v0"
+	// "github.com/adlerhurst/eventstore/v0/cockroachdb"
+	// "github.com/adlerhurst/eventstore/v0/memory"
 )
 
 type testUser struct {
@@ -309,14 +315,109 @@ func (e *testUserRemoved) CreationDate() time.Time { return time.Time{} }
 
 // UnmarshalPayload implements [eventstore.Event]
 func (e *testUserRemoved) UnmarshalPayload(object interface{}) error {
-	object = nil
 	return nil
 }
 
-func TestEventstore_Push(t *testing.T) {
-	type fields struct {
-		storage Eventstore
-	}
+type TestEventstore interface {
+	Eventstore
+	Before(ctx context.Context, t testing.TB) error
+	After(ctx context.Context, t testing.TB) error
+}
+
+// func TestEventstore_Push(t *testing.T) {
+// 	crdb := startCRDB(t)
+
+// 	type fields struct {
+// 		storage Eventstore
+// 	}
+// 	type args struct {
+// 		commands []Command
+// 	}
+// 	user := new(testUser)
+// 	*user = *defaultTestUser
+// 	user.id = "2"
+// 	tests := []struct {
+// 		name    string
+// 		fields  fields
+// 		args    args
+// 		want    []Event
+// 		wantErr bool
+// 	}{
+// 		{
+// 			name: "cockroachdb",
+// 			fields: fields{
+// 				storage: crdb,
+// 			},
+// 			args: args{
+// 				commands: []Command{
+// 					defaultTestUser.toAdded(),
+// 					defaultTestUser.toRemoved(),
+// 					user.toAdded(),
+// 				},
+// 			},
+// 			want: []Event{
+// 				defaultTestUser.toAdded(),
+// 				defaultTestUser.toRemoved(),
+// 				user.toAdded(),
+// 			},
+// 			wantErr: false,
+// 		},
+// 		{
+// 			name: "multiple events",
+// 			fields: fields{
+// 				storage: memory.New(),
+// 			},
+// 			args: args{
+// 				commands: []Command{
+// 					defaultTestUser.toAdded(),
+// 					defaultTestUser.toRemoved(),
+// 				},
+// 			},
+// 			want: []Event{
+// 				defaultTestUser.toAdded(),
+// 				defaultTestUser.toRemoved(),
+// 			},
+// 			wantErr: false,
+// 		},
+// 		{
+// 			name: "multiple aggregates",
+// 			fields: fields{
+// 				storage: memory.New(),
+// 			},
+// 			args: args{
+// 				commands: []Command{
+// 					defaultTestUser.toAdded(),
+// 					user.toAdded(),
+// 					defaultTestUser.toUsernameChanged(),
+// 					user.toFirstNameChanged(),
+// 					user.toLastNameChanged(),
+// 					defaultTestUser.toRemoved(),
+// 				},
+// 			},
+// 			want: []Event{
+// 				defaultTestUser.toAdded(),
+// 				user.toAdded(),
+// 				defaultTestUser.toUsernameChanged(),
+// 				user.toFirstNameChanged(),
+// 				user.toLastNameChanged(),
+// 				defaultTestUser.toRemoved(),
+// 			},
+// 			wantErr: false,
+// 		},
+// 	}
+// 	for _, tt := range tests {
+// 		t.Run(tt.name, func(t *testing.T) {
+// 			got, err := tt.fields.storage.Push(context.Background(), tt.args.commands...)
+// 			if (err != nil) != tt.wantErr {
+// 				t.Errorf("Eventstore.Push() error = %v, wantErr %v", err, tt.wantErr)
+// 				return
+// 			}
+// 			assertEvents(t, tt.want, got)
+// 		})
+// 	}
+// }
+
+func PushComplianceTests(ctx context.Context, t *testing.T, store TestEventstore) {
 	type args struct {
 		commands []Command
 	}
@@ -325,16 +426,12 @@ func TestEventstore_Push(t *testing.T) {
 	user.id = "2"
 	tests := []struct {
 		name    string
-		fields  fields
 		args    args
 		want    []Event
 		wantErr bool
 	}{
 		{
 			name: "multiple events",
-			fields: fields{
-				storage: memory.New(),
-			},
 			args: args{
 				commands: []Command{
 					defaultTestUser.toAdded(),
@@ -349,9 +446,6 @@ func TestEventstore_Push(t *testing.T) {
 		},
 		{
 			name: "multiple aggregates",
-			fields: fields{
-				storage: memory.New(),
-			},
 			args: args{
 				commands: []Command{
 					defaultTestUser.toAdded(),
@@ -374,65 +468,87 @@ func TestEventstore_Push(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
+		if err := store.Before(ctx, t); err != nil {
+			t.Error("unable to execute store.Before: ", err)
+		}
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := tt.fields.storage.Push(context.Background(), tt.args.commands...)
+			got, err := store.Push(ctx, tt.args.commands...)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Eventstore.Push() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			assertEvents(t, tt.want, got)
 		})
+		if err := store.After(ctx, t); err != nil {
+			t.Error("unable to execute store.After: ", err)
+		}
 	}
 }
 
-func BenchmarkEventstorePush(b *testing.B) {
-	tests := []struct {
-		name    string
-		storage Eventstore
-	}{
-		{
-			name:    "memory",
-			storage: memory.New(),
-		},
+func PushParallelOnSameAggregate(ctx context.Context, b *testing.B, store TestEventstore) {
+	if err := store.Before(ctx, b); err != nil {
+		b.Error("unable to execute store.Before: ", err)
 	}
-	for _, tt := range tests {
-		b.Run(tt.name, func(b *testing.B) {
-			for n := 0; n < b.N; n++ {
-				user := new(testUser)
-				*user = *defaultTestUser
-				user.id = strconv.Itoa(n)
-				cmds := []Command{
-					user.toAdded(),
-					user.toRemoved(),
-				}
-				_, err := tt.storage.Push(context.Background(), cmds...)
-				if err != nil {
-					b.Error(err)
-				}
-			}
-		})
+	b.ResetTimer()
+	b.RunParallel(func(p *testing.PB) {
+		for n := 0; p.Next(); n++ {
+			user := new(testUser)
+			*user = *defaultTestUser
+			user.id = b.Name()
+
+			pushDefaultCommands(ctx, b, store, user)
+		}
+	})
+	if err := store.After(ctx, b); err != nil {
+		b.Error("unable to execute store.After: ", err)
 	}
 }
 
-func TestEventstore_Filter(t *testing.T) {
-	type fields struct {
-		storage Eventstore
+func PushParallelOnDifferentAggregates(ctx context.Context, b *testing.B, store TestEventstore) {
+	if err := store.Before(ctx, b); err != nil {
+		b.Error("unable to execute store.Before: ", err)
 	}
+	b.ResetTimer()
+	b.RunParallel(func(p *testing.PB) {
+		for n := 0; p.Next(); n++ {
+			user := new(testUser)
+			*user = *defaultTestUser
+			user.id = b.Name() + strconv.Itoa(n)
+
+			pushDefaultCommands(ctx, b, store, user)
+		}
+	})
+	if err := store.After(ctx, b); err != nil {
+		b.Error("unable to execute store.After: ", err)
+	}
+}
+
+func pushDefaultCommands(ctx context.Context, t testing.TB, store TestEventstore, user *testUser) {
+	t.Helper()
+
+	cmds := []Command{
+		user.toAdded(),
+		user.toRemoved(),
+	}
+
+	_, err := store.Push(ctx, cmds...)
+	if err != nil {
+		t.Error(err)
+	}
+}
+
+func FilterComplianceTests(ctx context.Context, t *testing.T, store TestEventstore) {
 	type args struct {
 		filter *Filter
 	}
 	tests := []struct {
 		name    string
-		fields  fields
 		args    args
 		want    []Event
 		wantErr bool
 	}{
 		{
 			name: "multi token",
-			fields: fields{
-				storage: memory.New(),
-			},
 			args: args{
 				filter: &Filter{
 					Action: []Subject{TextSubject("user"), TextSubject("id"), MultiToken},
@@ -446,9 +562,6 @@ func TestEventstore_Filter(t *testing.T) {
 		},
 		{
 			name: "multiple single tokens",
-			fields: fields{
-				storage: memory.New(),
-			},
 			args: args{
 				filter: &Filter{
 					Action: []Subject{TextSubject("user"), SingleToken, SingleToken},
@@ -462,9 +575,22 @@ func TestEventstore_Filter(t *testing.T) {
 		},
 		{
 			name: "all",
-			fields: fields{
-				storage: memory.New(),
+			args: args{
+				filter: &Filter{
+					Action: []Subject{
+						TextSubject("user"),
+						TextSubject("id"),
+						TextSubject("added"),
+					},
+				},
 			},
+			want: []Event{
+				defaultTestUser.toAdded(),
+			},
+			wantErr: false,
+		},
+		{
+			name: "crdb",
 			args: args{
 				filter: &Filter{
 					Action: []Subject{MultiToken},
@@ -477,69 +603,73 @@ func TestEventstore_Filter(t *testing.T) {
 			wantErr: false,
 		},
 	}
+	cmds := []Command{
+		defaultTestUser.toAdded(),
+		defaultTestUser.toRemoved(),
+	}
 	for _, tt := range tests {
-		ctx := context.Background()
-		cmds := []Command{
-			defaultTestUser.toAdded(),
-			defaultTestUser.toRemoved(),
+		if err := store.Before(ctx, t); err != nil {
+			t.Error("unable to execute store.Before: ", err)
 		}
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := tt.fields.storage.Push(ctx, cmds...)
+			_, err := store.Push(ctx, cmds...)
 			if err != nil {
 				t.Fatalf("unable to push events: %v", err)
 			}
-			got, err := tt.fields.storage.Filter(ctx, tt.args.filter)
+			got, err := store.Filter(ctx, tt.args.filter)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Eventstore.Filter() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			assertEvents(t, tt.want, got)
 		})
+		if err := store.After(ctx, t); err != nil {
+			t.Error("unable to execute store.After: ", err)
+		}
 	}
 }
 
-func BenchmarkEventstoreFilter(b *testing.B) {
-	tests := []struct {
-		name    string
-		storage Eventstore
-	}{
-		{
-			name:    "memory",
-			storage: memory.New(),
-		},
-	}
-	for _, tt := range tests {
-		b.Run(tt.name, func(b *testing.B) {
-			user := new(testUser)
-			*user = *defaultTestUser
-			user.id = "2"
-			cmds := []Command{
-				user.toAdded(),
-				defaultTestUser.toAdded(),
-				defaultTestUser.toRemoved(),
-				user.toRemoved(),
-			}
-			_, err := tt.storage.Push(context.Background(), cmds...)
-			if err != nil {
-				b.Error(err)
-				b.FailNow()
-			}
-			for n := 0; n < b.N; n++ {
-				events, err := tt.storage.Filter(context.Background(), &Filter{
-					From:   0,
-					Limit:  2,
-					Action: []Subject{TextSubject("user"), SingleToken, TextSubject("added")},
-				})
-				if err != nil {
-					b.Error(err)
-				}
-				if len(events) != 2 {
-					b.Errorf("2 events should be returned got %d", len(events))
-				}
-			}
-		})
-	}
-}
+// func BenchmarkEventstoreFilter(b *testing.B) {
+// 	tests := []struct {
+// 		name    string
+// 		storage Eventstore
+// 	}{
+// 		{
+// 			name:    "memory",
+// 			storage: memory.New(),
+// 		},
+// 	}
+// 	for _, tt := range tests {
+// 		b.Run(tt.name, func(b *testing.B) {
+// 			user := new(testUser)
+// 			*user = *defaultTestUser
+// 			user.id = "2"
+// 			cmds := []Command{
+// 				user.toAdded(),
+// 				defaultTestUser.toAdded(),
+// 				defaultTestUser.toRemoved(),
+// 				user.toRemoved(),
+// 			}
+// 			_, err := tt.storage.Push(context.Background(), cmds...)
+// 			if err != nil {
+// 				b.Error(err)
+// 				b.FailNow()
+// 			}
+// 			for n := 0; n < b.N; n++ {
+// 				events, err := tt.storage.Filter(context.Background(), &Filter{
+// 					Limit:  2,
+// 					Action: []Subject{TextSubject("user"), SingleToken, TextSubject("added")},
+// 				})
+// 				if err != nil {
+// 					b.Error(err)
+// 				}
+// 				if len(events) != 2 {
+// 					b.Errorf("2 events should be returned got %d", len(events))
+// 				}
+// 			}
+// 		})
+// 	}
+// }
 
 func assertEvents(t *testing.T, want, got []Event) (failed bool) {
 	t.Helper()
@@ -671,4 +801,31 @@ func assertPayload(t *testing.T, want, got Event) (failed bool) {
 // 	}
 
 // 	return failed
+// }
+
+// func startCRDB(t testing.TB) *cockroachdb.CockroachDB {
+// 	t.Helper()
+
+// 	var ts *testserver.TestServer
+// 	_ = ts
+// 	// ts, err := testserver.NewTestServer()
+// 	// if err != nil {
+// 	// 	t.Fatal(err)
+// 	// }
+// 	// dbpool, err := pgxpool.New(context.Background(), ts.PGURL().String())
+// 	dbpool, err := pgxpool.New(context.Background(), "postgresql://root@localhost:26257/weekend?sslmode=disable")
+
+// 	if err != nil {
+// 		t.Errorf("unable to create database pool: %v", err)
+// 		t.FailNow()
+// 	}
+
+// 	crdb := cockroachdb.New(&cockroachdb.Config{
+// 		Pool: dbpool,
+// 	})
+// 	if err := crdb.Setup(context.Background()); err != nil {
+// 		t.Fatalf("unable to setup cockroach: %v", err)
+// 	}
+
+// 	return crdb
 // }

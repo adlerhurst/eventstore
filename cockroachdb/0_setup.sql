@@ -1,16 +1,19 @@
 CREATE SCHEMA IF NOT EXISTS eventstore;
 
 CREATE TABLE IF NOT EXISTS eventstore.events (
-    aggregate STRING[] NOT NULL
-    , action STRING[] NOT NULL
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid()
+    , "aggregate" STRING[] NOT NULL
+    , joined_aggregate STRING NOT NULL
+
+    , "action" STRING[] NOT NULL
     , revision INT2 NOT NULL
     , metadata JSONB
     , payload JSONB
-    , sequence INT4 NOT NULL
-    , creation_date TIMESTAMPTZ NOT NULL DEFAULT now()
+    , "sequence" INT4 NOT NULL
+    , created_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp()
 
-    , CONSTRAINT "primary" PRIMARY KEY (aggregate, sequence)
-    , INDEX action_idx (action)
+    -- , UNIQUE (joined_aggregate, sequence DESC)
+    , INVERTED INDEX action_idx ("action")
     , INVERTED INDEX metadata_idx (metadata)
-    , INDEX sequence_idx (sequence)
+    , INDEX sequence_idx ("sequence")
 );

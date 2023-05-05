@@ -81,18 +81,18 @@ func (s *Storage) Filter(ctx context.Context, filter *eventstore.Filter) ([]even
 	return events, nil
 }
 
-func checkFrom(from uint64, event *Event) bool {
-	if from == 0 {
+func checkFrom(from time.Time, event *Event) bool {
+	if from.IsZero() {
 		return true
 	}
-	return event.sequence > from
+	return event.creationDate.After(from)
 }
 
-func checkTo(to uint64, event *Event) bool {
-	if to == 0 {
+func checkTo(to time.Time, event *Event) bool {
+	if to.IsZero() {
 		return true
 	}
-	return event.sequence < to
+	return to.After(event.creationDate)
 }
 
 func checkAction(action []eventstore.Subject, event *Event) bool {

@@ -1,4 +1,4 @@
-package cockroachdb
+package outbox
 
 import (
 	"context"

@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"strconv"
+	"sync/atomic"
 
 	// "fmt"
 	"reflect"
@@ -509,11 +510,16 @@ func PushParallelOnDifferentAggregates(ctx context.Context, b *testing.B, store 
 		b.Error("unable to execute store.Before: ", err)
 	}
 	b.ResetTimer()
+
+	var n atomic.Int64
+
 	b.RunParallel(func(p *testing.PB) {
-		for n := 0; p.Next(); n++ {
+		for p.Next() {
+
+			i := n.Add(1)
 			user := new(testUser)
 			*user = *defaultTestUser
-			user.id = b.Name() + strconv.Itoa(n)
+			user.id = b.Name() + strconv.Itoa(int(i))
 
 			pushDefaultCommands(ctx, b, store, user)
 		}

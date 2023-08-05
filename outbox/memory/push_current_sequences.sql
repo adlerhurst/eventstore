@@ -2,13 +2,13 @@ SELECT
     "sequence"
     , "aggregate" 
 FROM 
-    eventstore.events
+    outbox.events
 WHERE 
     ("sequence", "aggregate") IN (
         SELECT 
             (max("sequence"), "aggregate") 
         FROM 
-            eventstore.events 
+            outbox.events 
         WHERE 
             {{currentSequencesClauses}}
         GROUP BY 

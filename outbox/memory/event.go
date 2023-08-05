@@ -1,4 +1,4 @@
-package outbox
+package memory
 
 import (
 	"encoding/json"
@@ -18,6 +18,7 @@ type Event struct {
 	creationDate time.Time
 	sequence     uint32
 	payload      []byte
+	receivers    []receiver
 }
 
 // Action implements [eventstore.Event]
@@ -65,10 +66,10 @@ func (e *Event) UnmarshalPayload(object interface{}) error {
 	return json.Unmarshal(e.payload, object)
 }
 
-func eventsFromCommands(commands []eventstore.Command) (events []*Event, err error) {
+func (crdb *CockroachDB) eventsFromCommands(commands []eventstore.Command) (events []*Event, err error) {
 	events = make([]*Event, len(commands))
 	for i, command := range commands {
-		events[i], err = eventFromCommand(command)
+		events[i], err = crdb.eventFromCommand(command)
 		if err != nil {
 			return nil, err
 		}
@@ -77,11 +78,12 @@ func eventsFromCommands(commands []eventstore.Command) (events []*Event, err err
 	return events, nil
 }
 
-func eventFromCommand(command eventstore.Command) (event *Event, err error) {
+func (crdb *CockroachDB) eventFromCommand(command eventstore.Command) (event *Event, err error) {
 	event = &Event{
 		action:    command.Action(),
 		aggregate: command.Aggregate(),
 		revision:  command.Revision(),
+		receivers: crdb.outbox.lookupReceivers(command.Action()),
 	}
 
 	if len(command.Metadata()) > 0 {

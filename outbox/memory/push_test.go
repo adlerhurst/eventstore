@@ -1,4 +1,4 @@
-package outbox
+package memory
 
 import (
 	"context"
@@ -15,12 +15,18 @@ func Benchmark_Push_ParallelSameAggregate(b *testing.B) {
 }
 
 func Benchmark_Push_ParallelDifferentAggregate(b *testing.B) {
+	store.Subscribe("all", []eventstore.Subject{eventstore.MultiToken})
+	store.Subscribe("all_user_added", []eventstore.Subject{eventstore.TextSubject("user"), eventstore.SingleToken, eventstore.TextSubject("added")})
+	store.Subscribe("never", []eventstore.Subject{eventstore.TextSubject("project")})
+	store.Subscribe("never2", []eventstore.Subject{eventstore.SingleToken, eventstore.TextSubject("never")})
 	b.Run("Benchmark_Push_ParallelDifferentAggregate", func(b *testing.B) {
 		eventstore.PushParallelOnDifferentAggregates(context.Background(), b, store)
 	})
 }
 
 func Test_Push_Compliance(t *testing.T) {
+	store.Subscribe("test", []eventstore.Subject{eventstore.MultiToken})
+	store.Subscribe("test2", []eventstore.Subject{eventstore.TextSubject("user"), eventstore.SingleToken, eventstore.TextSubject("added")})
 	eventstore.PushComplianceTests(context.Background(), t, store)
 }
 

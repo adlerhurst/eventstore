@@ -11,5 +11,5 @@ CREATE TABLE IF NOT EXISTS eventstore.events (
     , "sequence" INT4 NOT NULL
     , created_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp()
 
-    , CONSTRAINT pk PRIMARY KEY ("aggregate", "sequence" DESC)
+    , PRIMARY KEY ("aggregate", "sequence" DESC)
 );

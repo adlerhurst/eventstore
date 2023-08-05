@@ -7,7 +7,7 @@ SELECT
     , "sequence"
     , created_at
 FROM
-    eventstore.events
+    outbox.events
 {{.Where}}
 ORDER BY
     created_at

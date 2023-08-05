@@ -1,4 +1,4 @@
-INSERT INTO eventstore.events (
+INSERT INTO outbox.events (
     "aggregate"
     , joined_aggregate
     

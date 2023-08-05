@@ -1,11 +1,10 @@
-package outbox
+package memory
 
 import (
 	"bytes"
 	"context"
 	_ "embed"
 	"fmt"
-	"log"
 	"reflect"
 	"strconv"
 	"strings"
@@ -20,6 +19,8 @@ import (
 var (
 	//go:embed push.sql
 	pushStmt string
+	//go:embed outbox.sql
+	outboxStmt string
 	//go:embed push_current_sequences.sql
 	pushtCurrentSequencesStmt string
 )
@@ -28,7 +29,7 @@ var (
 func (crdb *CockroachDB) Push(ctx context.Context, commands ...eventstore.Command) (result []eventstore.Event, err error) {
 	indexes := prepareIndexes(commands)
 
-	events, err := eventsFromCommands(commands)
+	events, err := crdb.eventsFromCommands(commands)
 	if err != nil {
 		return nil, err
 	}
@@ -45,7 +46,10 @@ func (crdb *CockroachDB) Push(ctx context.Context, commands ...eventstore.Comman
 		}
 
 		result, err = push(ctx, tx, indexes, events)
-		return err
+		if err != nil {
+			return err
+		}
+		return crdb.pushToOutbox(ctx, tx, events)
 	})
 
 	if err != nil {
@@ -85,6 +89,10 @@ func currentSequences(ctx context.Context, tx pgx.Tx, indexes *aggregateIndexes)
 
 		index := indexes.byAggregate(aggregate)
 		index.index = sequence
+	}
+
+	if rows.Err() != nil {
+		return rows.Err()
 	}
 
 	return nil
@@ -131,10 +139,44 @@ func push(ctx context.Context, tx pgx.Tx, indexes *aggregateIndexes, events []*E
 	}
 
 	if rows.Err() != nil {
-		log.Println("rows2: ", rows.Err())
 		return nil, rows.Err()
 	}
 	return result, nil
+}
+
+func (crdb *CockroachDB) pushToOutbox(ctx context.Context, tx pgx.Tx, events []*Event) error {
+	params := make([]string, 0, len(events))
+	args := make([]any, 0, len(events)*4)
+
+	var paramIndex int
+	for _, event := range events {
+		for _, r := range event.receivers {
+			params = append(params, fmt.Sprintf("($%d, $%d, $%d, $%d)", paramIndex+1, paramIndex+2, paramIndex+3, paramIndex+4))
+			paramIndex += 4
+			args = append(args, event.aggregate, event.sequence, event.creationDate, r)
+		}
+	}
+
+	if len(params) == 0 {
+		return nil
+	}
+
+	pushTmpl := template.
+		Must(template.New("outbox").
+			Funcs(template.FuncMap{
+				"insertValues": func() string {
+					return strings.Join(params, ", ")
+				},
+			}).
+			Parse(outboxStmt))
+
+	buf := bytes.NewBuffer(nil)
+	if err := pushTmpl.Execute(buf, nil); err != nil {
+		panic(err)
+	}
+
+	_, err := tx.Exec(ctx, buf.String(), args...)
+	return err
 }
 
 func prepareIndexes(commands []eventstore.Command) *aggregateIndexes {

@@ -1,8 +1,9 @@
-package outbox
+package memory
 
 import (
 	"context"
 	_ "embed"
+	"sync"
 	"text/template"
 
 	"github.com/adlerhurst/eventstore/v0"
@@ -21,11 +22,16 @@ var _ eventstore.Eventstore = (*CockroachDB)(nil)
 
 type CockroachDB struct {
 	client *pgxpool.Pool
+	outbox outbox
 }
 
 func New(config *Config) *CockroachDB {
 	return &CockroachDB{
 		config.Pool,
+		outbox{
+			mu:            sync.RWMutex{},
+			subscriptions: &subscription{},
+		},
 	}
 }
 

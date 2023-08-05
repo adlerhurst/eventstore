@@ -11,15 +11,16 @@ CREATE TABLE IF NOT EXISTS outbox.events (
     , "sequence" INT4 NOT NULL
     , created_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp()
 
-    , CONSTRAINT pk PRIMARY KEY ("aggregate", "sequence" DESC)
+    , PRIMARY KEY ("aggregate", "sequence" DESC)
 );
 
 
 CREATE TABLE IF NOT EXISTS outbox.outbox (
     "aggregate" STRING[] NOT NULL
     , "sequence" INT4 NOT NULL
-    , reveiver STRING NOT NULL
+    , created_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp()
+    , receiver STRING NOT NULL
 
-    , CONSTRAINT pk PRIMARY KEY ("aggregate", "sequence")
-    , CONSTRAINT fk_event FOREIGN KEY ("aggregate", "sequence") REFERENCES outbox.events ON DELETE CASCADE
+    , PRIMARY KEY (receiver, "aggregate", "sequence")
+    , FOREIGN KEY ("aggregate", "sequence") REFERENCES outbox.events ON DELETE CASCADE
 );

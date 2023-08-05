@@ -5,7 +5,6 @@ import (
 	"context"
 	_ "embed"
 	"fmt"
-	"log"
 	"reflect"
 	"strconv"
 	"strings"
@@ -131,7 +130,6 @@ func push(ctx context.Context, tx pgx.Tx, indexes *aggregateIndexes, events []*E
 	}
 
 	if rows.Err() != nil {
-		log.Println("rows2: ", rows.Err())
 		return nil, rows.Err()
 	}
 	return result, nil

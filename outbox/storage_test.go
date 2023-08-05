@@ -44,7 +44,6 @@ func startCRDB() *testStorage {
 	// 	t.Fatal(err)
 	// }
 	// dbpool, err := pgxpool.New(context.Background(), ts.PGURL().String())
-	// dbpool, err := pgxpool.New(context.Background(), "postgresql://adlerhurst:Rel4-Qsyn2tEbMM8wBdAEw@silvan-test-multi-region-8.h4f.cockroachlabs.cloud:26257/defaultdb?sslmode=verify-full")
 	config, err := pgxpool.ParseConfig("postgresql://root@localhost:26257/weekend?sslmode=disable&application_name=bench4")
 	if err != nil {
 		log.Fatalf("unable to parse conn string: %v", err)

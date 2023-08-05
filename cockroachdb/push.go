@@ -207,7 +207,7 @@ func (indexes *aggregateIndexes) toValues() string {
 	values := make([]string, indexes.commandCount)
 	var index = 0
 	for i := 0; i < indexes.commandCount; i++ {
-		values[i] = fmt.Sprintf("($%[1]d, array_to_string($%[1]d, ':'), $%[2]d, $%[3]d, $%[4]d, $%[5]d, $%[6]d)", index+1, index+2, index+3, index+4, index+5, index+6)
+		values[i] = fmt.Sprintf("($%d, $%d, $%d, $%d, $%d, $%d)", index+1, index+2, index+3, index+4, index+5, index+6)
 		index += 6
 	}
 

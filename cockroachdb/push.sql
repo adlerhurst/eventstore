@@ -1,7 +1,5 @@
 INSERT INTO eventstore.events (
     "aggregate"
-    , joined_aggregate
-    
     , "action"
     , revision
     , metadata

@@ -1,7 +1,5 @@
 INSERT INTO outbox.events (
     "aggregate"
-    , joined_aggregate
-    
     , "action"
     , revision
     , metadata

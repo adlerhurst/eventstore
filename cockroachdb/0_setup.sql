@@ -2,8 +2,6 @@ CREATE SCHEMA IF NOT EXISTS eventstore;
 
 CREATE TABLE IF NOT EXISTS eventstore.events (
     "aggregate" STRING[] NOT NULL
-    , joined_aggregate STRING NOT NULL
-
     , "action" STRING[] NOT NULL
     , revision INT2 NOT NULL
     , metadata JSONB

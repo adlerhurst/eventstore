@@ -17,3 +17,6 @@
 # vs code 
 .vscode/*
 __debug_bin*
+
+# fs
+fs/test*

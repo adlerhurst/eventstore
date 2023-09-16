@@ -16,3 +16,4 @@
 
 # vs code 
 .vscode/*
+__debug_bin*

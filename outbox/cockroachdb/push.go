@@ -10,7 +10,7 @@ import (
 	"strings"
 	"text/template"
 
-	// crdbpgx "github.com/cockroachdb/cockroach-go/v2/crdb/crdbpgxv5"
+	crdbpgx "github.com/cockroachdb/cockroach-go/v2/crdb/crdbpgxv5"
 	"github.com/jackc/pgx/v5"
 
 	"github.com/adlerhurst/eventstore/v0"
@@ -19,15 +19,17 @@ import (
 var (
 	//go:embed push.sql
 	pushStmt string
+	//go:embed outbox.sql
+	outboxStmt string
 	//go:embed push_current_sequences.sql
 	pushtCurrentSequencesStmt string
 )
 
 // Push implements [eventstore.Eventstore]
-func (crdb *CockroachDB) Push(ctx context.Context, aggregates ...eventstore.Aggregate) (result []eventstore.Event, err error) {
-	indexes := prepareIndexes(aggregates)
+func (crdb *CockroachDB) Push(ctx context.Context, commands ...eventstore.Command) (result []eventstore.Event, err error) {
+	indexes := prepareIndexes(commands)
 
-	events, err := eventsFromAggregates(aggregates)
+	events, err := crdb.eventsFromCommands(commands)
 	if err != nil {
 		return nil, err
 	}
@@ -38,26 +40,22 @@ func (crdb *CockroachDB) Push(ctx context.Context, aggregates ...eventstore.Aggr
 	}
 	defer conn.Release()
 
-	tx, err := conn.Begin(ctx)
+	err = crdbpgx.ExecuteTx(ctx, conn, pgx.TxOptions{}, func(tx pgx.Tx) error {
+		if err = currentSequences(ctx, tx, indexes); err != nil {
+			return err
+		}
+
+		result, err = push(ctx, tx, indexes, events)
+		if err != nil {
+			return err
+		}
+		return crdb.pushToOutbox(ctx, tx, events)
+	})
+
 	if err != nil {
 		return nil, err
 	}
-	defer func() {
-		if err != nil {
-			_ = tx.Rollback(ctx)
-			return
-		}
-		err = tx.Commit(ctx)
-		if err != nil {
-			result = nil
-		}
-	}()
-
-	if err = currentSequences(ctx, tx, indexes); err != nil {
-		return nil, err
-	}
-
-	return push(ctx, tx, indexes, events)
+	return result, nil
 }
 
 func currentSequences(ctx context.Context, tx pgx.Tx, indexes *aggregateIndexes) (err error) {
@@ -82,7 +80,7 @@ func currentSequences(ctx context.Context, tx pgx.Tx, indexes *aggregateIndexes)
 	for rows.Next() {
 		var (
 			aggregate eventstore.TextSubjects
-			sequence  uint32
+			sequence  uint64
 		)
 
 		if err = rows.Scan(&sequence, &aggregate); err != nil {
@@ -90,10 +88,11 @@ func currentSequences(ctx context.Context, tx pgx.Tx, indexes *aggregateIndexes)
 		}
 
 		index := indexes.byAggregate(aggregate)
-		if index.shouldCheckSequence && index.sequence != sequence {
-			return eventstore.ErrSequenceNotMatched
-		}
 		index.index = sequence
+	}
+
+	if rows.Err() != nil {
+		return rows.Err()
 	}
 
 	return nil
@@ -116,14 +115,13 @@ func push(ctx context.Context, tx pgx.Tx, indexes *aggregateIndexes, events []*E
 	result := make([]eventstore.Event, len(events))
 
 	for i, event := range events {
-		event.sequence = indexes.increment(event.Aggregate())
 		args = append(args,
 			event.aggregate,
 			event.action,
 			event.revision,
+			event.metadata,
 			event.payload,
-			event.sequence,
-			i,
+			indexes.increment(event.Aggregate()),
 		)
 		result[i] = event
 	}
@@ -135,7 +133,7 @@ func push(ctx context.Context, tx pgx.Tx, indexes *aggregateIndexes, events []*E
 	defer rows.Close()
 
 	for i := 0; rows.Next(); i++ {
-		if err = rows.Scan(&events[i].creationDate, &events[i].position); err != nil {
+		if err = rows.Scan(&events[i].sequence, &events[i].creationDate); err != nil {
 			return nil, fmt.Errorf("push failed: %w", err)
 		}
 	}
@@ -146,26 +144,55 @@ func push(ctx context.Context, tx pgx.Tx, indexes *aggregateIndexes, events []*E
 	return result, nil
 }
 
-func prepareIndexes(aggregates []eventstore.Aggregate) *aggregateIndexes {
-	indexes := &aggregateIndexes{
-		aggregates: make([]*aggregateIndex, 0, len(aggregates)),
+func (crdb *CockroachDB) pushToOutbox(ctx context.Context, tx pgx.Tx, events []*Event) error {
+	params := make([]string, 0, len(events))
+	args := make([]any, 0, len(events)*4)
+
+	var paramIndex int
+	for _, event := range events {
+		for _, r := range event.receivers {
+			params = append(params, fmt.Sprintf("($%d, $%d, $%d, $%d)", paramIndex+1, paramIndex+2, paramIndex+3, paramIndex+4))
+			paramIndex += 4
+			args = append(args, event.aggregate, event.sequence, event.creationDate, r)
+		}
 	}
 
-	for _, aggregate := range aggregates {
-		indexes.commandCount += len(aggregate.Commands())
-		index := indexes.byAggregate(aggregate.ID())
+	if len(params) == 0 {
+		return nil
+	}
+
+	pushTmpl := template.
+		Must(template.New("outbox").
+			Funcs(template.FuncMap{
+				"insertValues": func() string {
+					return strings.Join(params, ", ")
+				},
+			}).
+			Parse(outboxStmt))
+
+	buf := bytes.NewBuffer(nil)
+	if err := pushTmpl.Execute(buf, nil); err != nil {
+		panic(err)
+	}
+
+	_, err := tx.Exec(ctx, buf.String(), args...)
+	return err
+}
+
+func prepareIndexes(commands []eventstore.Command) *aggregateIndexes {
+	indexes := &aggregateIndexes{
+		aggregates:   make([]*aggregateIndex, 0, len(commands)),
+		commandCount: len(commands),
+	}
+
+	for _, command := range commands {
+		index := indexes.byAggregate(command.Aggregate())
 		if index != nil {
 			continue
 		}
-		index = &aggregateIndex{
-			aggregate: aggregate.ID(),
-		}
-		sequenceChecker, ok := aggregate.(eventstore.AggregatePredefinedSequence)
-		if ok {
-			index.shouldCheckSequence = true
-			index.sequence = sequenceChecker.CurrentSequence()
-		}
-		indexes.aggregates = append(indexes.aggregates, index)
+		indexes.aggregates = append(indexes.aggregates, &aggregateIndex{
+			aggregate: command.Aggregate(),
+		})
 	}
 
 	return indexes
@@ -177,10 +204,8 @@ type aggregateIndexes struct {
 }
 
 type aggregateIndex struct {
-	aggregate           eventstore.TextSubjects
-	index               uint32
-	shouldCheckSequence bool
-	sequence            uint32
+	aggregate eventstore.TextSubjects
+	index     uint64
 }
 
 func (indexes *aggregateIndexes) byAggregate(aggregate eventstore.TextSubjects) *aggregateIndex {
@@ -193,7 +218,7 @@ func (indexes *aggregateIndexes) byAggregate(aggregate eventstore.TextSubjects) 
 	return nil
 }
 
-func (indexes *aggregateIndexes) increment(aggregate eventstore.TextSubjects) uint32 {
+func (indexes *aggregateIndexes) increment(aggregate eventstore.TextSubjects) uint64 {
 	index := indexes.byAggregate(aggregate)
 	if index == nil {
 		panic(fmt.Sprintf("aggregate not prepared in indexes: %v", aggregate))
@@ -226,7 +251,7 @@ func (indexes *aggregateIndexes) toValues() string {
 	values := make([]string, indexes.commandCount)
 	var index = 0
 	for i := 0; i < indexes.commandCount; i++ {
-		values[i] = fmt.Sprintf("($%d::TEXT[], $%d::TEXT[], $%d::INT2, $%d::JSONB, $%d::INT4, $%d::INT4)", index+1, index+2, index+3, index+4, index+5, index+6)
+		values[i] = fmt.Sprintf("($%d, $%d, $%d, $%d, $%d, $%d)", index+1, index+2, index+3, index+4, index+5, index+6)
 		index += 6
 	}
 

@@ -1,0 +1,1 @@
+DELETE FROM outbox2.subscriptions WHERE id = $1 CASCADE;

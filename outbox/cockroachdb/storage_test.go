@@ -25,7 +25,7 @@ func (*testStorage) After(ctx context.Context, t testing.TB) error {
 
 // Before implements eventstore.TestEventstore
 func (s *testStorage) Before(ctx context.Context, t testing.TB) (err error) {
-	_, err = s.client.Exec(ctx, "TRUNCATE eventstore.events")
+	_, err = s.client.Exec(ctx, "TRUNCATE outbox.events CASCADE")
 	return err
 }
 

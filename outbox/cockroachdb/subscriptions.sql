@@ -1,0 +1,1 @@
+SELECT id FROM outbox2.subscriptions WHERE 

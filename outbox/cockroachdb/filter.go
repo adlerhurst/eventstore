@@ -10,7 +10,6 @@ import (
 	"text/template"
 
 	"github.com/adlerhurst/eventstore/v0"
-	"github.com/jackc/pgx/v5"
 )
 
 var (
@@ -23,19 +22,7 @@ var (
 func (crdb *CockroachDB) Filter(ctx context.Context, filter *eventstore.Filter) (events []eventstore.Event, err error) {
 	query, args := prepareStatement(filter)
 
-	tx, err := crdb.client.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.ReadCommitted, AccessMode: pgx.ReadOnly})
-	if err != nil {
-		return nil, err
-	}
-	defer func() {
-		if err != nil {
-			_ = tx.Rollback(ctx)
-			return
-		}
-		_ = tx.Commit(ctx)
-	}()
-
-	rows, err := tx.Query(ctx, query, args...)
+	rows, err := crdb.client.Query(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -47,10 +34,10 @@ func (crdb *CockroachDB) Filter(ctx context.Context, filter *eventstore.Filter) 
 			&event.aggregate,
 			&event.action,
 			&event.revision,
+			&event.metadata,
 			&event.payload,
 			&event.sequence,
 			&event.creationDate,
-			&event.position,
 		)
 		if err != nil {
 			return nil, err

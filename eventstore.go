@@ -2,6 +2,7 @@ package eventstore
 
 import (
 	"context"
+	"errors"
 	"time"
 )
 
@@ -12,17 +13,35 @@ type Eventstore interface {
 	Ready(context.Context) error
 	// Push stores the command's and returns the resulting Event's
 	// the command's should be stored in a single transaction
-	Push(context.Context, ...Command) ([]Event, error)
+	// if the current sequence of an [AggregatePredefinedSequence] does not match
+	// [ErrSequenceNotMatched] is returned
+	Push(ctx context.Context, aggregates ...Aggregate) ([]Event, error)
 	// Filter returns the events matching the subject
 	Filter(context.Context, *Filter) ([]Event, error)
 }
 
+// Aggregate represents the stream the events are written to
+// If the aggregate implements [AggregatePredefinedSequence],
+// the current sequence of the aggregate is verified from the storage
+type Aggregate interface {
+	// ID is the unique identifier of the stream
+	ID() TextSubjects
+	// Commands is the list of write intents
+	Commands() []Command
+}
+
+// AggregatePredefinedSequence is used in storage to determine if the command requires a specific sequence
+// If the order doesn't matter the command must not implement this interface
+type AggregatePredefinedSequence interface {
+	Command
+	// CrrentSequence returns the current sequence of the aggregate
+	// If it's the first command return 0
+	// If it's the nth command return the specific sequence
+	CurrentSequence() uint32
+}
+
 // Action describes the base data of [Command]'s and [Event]'s
 type Action interface {
-	// Aggregate represents the object the command belongs to
-	// and is used to generate the `Sequence` of the [Event]
-	// e.g. user A: {"users", "A"}
-	Aggregate() TextSubjects
 	// Action represent the change of an object
 	//
 	// most likely the [Aggregate()] list will be the first elements of the
@@ -32,10 +51,6 @@ type Action interface {
 	// Revision is an upcounting number which represents the version of the schema of the payload
 	// the revision must change as soon as the logic to create the payload or schema of the payload changes
 	Revision() uint16
-	// Metadata are additional data relevant for the event
-	// e.g. the service which created the event.
-	// The value must be a primitive type
-	Metadata() map[string]interface{}
 }
 
 // Command represents a change to be made
@@ -46,23 +61,23 @@ type Command interface {
 	// - nil (no payload),
 	// - struct which can be marshalled
 	// - pointer to struct which can be marshalled
-	Payload() interface{}
-
-	// Options allow to configure the behaviour of commands during writes.
-	// They are defined by the different eventstore layers
-	Options() []func(Command) error
+	Payload() any
 }
 
 // Event is the abstraction if a user wants to get events mapped by the eventstore
 type Event interface {
 	Action
+	// Aggregate represents the object the command belongs to
+	// and is used to generate the `Sequence` of the [Event]
+	// e.g. user A: {"users", "A"}
+	Aggregate() TextSubjects
 	// Sequence represents the position of the event inside a specific subject
 	Sequence() uint64
 	// CreationDate is the timestamp the event was stored to the eventstore
 	CreationDate() time.Time
 	// UnmarshalPayload maps the stored payload into the given object
 	// object must be of type *struct
-	UnmarshalPayload(object interface{}) error
+	UnmarshalPayload(object any) error
 }
 
 // Filter represents a query
@@ -86,3 +101,7 @@ type CreatedAtFilter struct {
 	From time.Time
 	To   time.Time
 }
+
+var (
+	ErrSequenceNotMatched = errors.New("sequence of aggregate did not match")
+)

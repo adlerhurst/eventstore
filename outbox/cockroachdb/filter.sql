@@ -2,14 +2,13 @@ SELECT
     "aggregate"
     , "action"
     , revision
+    , metadata
     , payload
     , "sequence"
     , created_at
-    , position
 FROM
-    eventstore.events
+    outbox.events
 {{.Where}}
 ORDER BY
-    position
-    , in_tx_order
+    created_at
 {{.Limit}}

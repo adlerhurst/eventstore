@@ -1,6 +1,7 @@
 package cockroachdb
 
 import (
+	"context"
 	_ "embed"
 	"reflect"
 	"testing"
@@ -9,9 +10,15 @@ import (
 	"github.com/adlerhurst/eventstore/v0"
 )
 
-// func Test_Filter_Compliance(t *testing.T) {
-// 	eventstore.FilterComplianceTests(context.Background(), t, store)
-// }
+func Benchmark_Filter(b *testing.B) {
+	b.Run("Benchmark_Filter", func(b *testing.B) {
+		eventstore.FilterBenchTests(context.Background(), b, store)
+	})
+}
+
+func Test_Filter_Compliance(t *testing.T) {
+	eventstore.FilterComplianceTests(context.Background(), t, store)
+}
 
 func Test_filterToWhere(t *testing.T) {
 	timeArg := time.Now()

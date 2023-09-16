@@ -3,7 +3,6 @@ package eventstore
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"reflect"
 	"strconv"
 	"strings"
@@ -453,97 +452,209 @@ func pushDefaultCommands(ctx context.Context, t testing.TB, store TestEventstore
 	}
 }
 
-// func FilterComplianceTests(ctx context.Context, t *testing.T, store TestEventstore) {
-// 	type args struct {
-// 		filter *Filter
-// 	}
-// 	tests := []struct {
-// 		name    string
-// 		args    args
-// 		want    []Event
-// 		wantErr bool
-// 	}{
-// 		{
-// 			name: "multi token",
-// 			args: args{
-// 				filter: &Filter{
-// 					Action: []Subject{TextSubject("user"), TextSubject("id"), MultiToken},
-// 				},
-// 			},
-// 			want: []Event{
-// 				defaultTestUser.toAdded(),
-// 				defaultTestUser.toRemoved(),
-// 			},
-// 			wantErr: false,
-// 		},
-// 		{
-// 			name: "multiple single tokens",
-// 			args: args{
-// 				filter: &Filter{
-// 					Action: []Subject{TextSubject("user"), SingleToken, SingleToken},
-// 				},
-// 			},
-// 			want: []Event{
-// 				defaultTestUser.toAdded(),
-// 				defaultTestUser.toRemoved(),
-// 			},
-// 			wantErr: false,
-// 		},
-// 		{
-// 			name: "all",
-// 			args: args{
-// 				filter: &Filter{
-// 					Action: []Subject{
-// 						TextSubject("user"),
-// 						TextSubject("id"),
-// 						TextSubject("added"),
-// 					},
-// 				},
-// 			},
-// 			want: []Event{
-// 				defaultTestUser.toAdded(),
-// 			},
-// 			wantErr: false,
-// 		},
-// 		{
-// 			name: "crdb",
-// 			args: args{
-// 				filter: &Filter{
-// 					Action: []Subject{MultiToken},
-// 				},
-// 			},
-// 			want: []Event{
-// 				defaultTestUser.toAdded(),
-// 				defaultTestUser.toRemoved(),
-// 			},
-// 			wantErr: false,
-// 		},
-// 	}
-// 	cmds := []Command{
-// 		defaultTestUser.toAdded(),
-// 		defaultTestUser.toRemoved(),
-// 	}
-// 	for _, tt := range tests {
-// 		if err := store.Before(ctx, t); err != nil {
-// 			t.Error("unable to execute store.Before: ", err)
-// 		}
-// 		t.Run(tt.name, func(t *testing.T) {
-// 			_, err := store.Push(ctx, cmds...)
-// 			if err != nil {
-// 				t.Fatalf("unable to push events: %v", err)
-// 			}
-// 			got, err := store.Filter(ctx, tt.args.filter)
-// 			if (err != nil) != tt.wantErr {
-// 				t.Errorf("Filter() error = %v, wantErr %v", err, tt.wantErr)
-// 				return
-// 			}
-// 			assertEvents(t, tt.want, got)
-// 		})
-// 		if err := store.After(ctx, t); err != nil {
-// 			t.Error("unable to execute store.After: ", err)
-// 		}
-// 	}
-// }
+func FilterComplianceTests(ctx context.Context, t *testing.T, store TestEventstore) {
+	type args struct {
+		filter *Filter
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    []*testUser
+		wantErr bool
+	}{
+		{
+			name: "multi token",
+			args: args{
+				filter: &Filter{
+					Action: []Subject{TextSubject("user"), TextSubject("5555"), MultiToken},
+				},
+			},
+			want: []*testUser{
+				newTestUser("5555",
+					withAdded("first name", "last name", "username"),
+					withRemoved(),
+				),
+			},
+			wantErr: false,
+		},
+		{
+			name: "multiple single tokens",
+			args: args{
+				filter: &Filter{
+					Action: []Subject{TextSubject("user"), SingleToken, SingleToken},
+				},
+			},
+			want: []*testUser{
+				newTestUser("5555",
+					withAdded("first name", "last name", "username"),
+					withRemoved(),
+				),
+			},
+			wantErr: false,
+		},
+		{
+			name: "all",
+			args: args{
+				filter: &Filter{
+					Action: []Subject{
+						TextSubject("user"),
+						TextSubject("5555"),
+						TextSubject("added"),
+					},
+				},
+			},
+			want: []*testUser{
+				newTestUser("5555",
+					withAdded("first name", "last name", "username"),
+				),
+			},
+			wantErr: false,
+		},
+		{
+			name: "crdb",
+			args: args{
+				filter: &Filter{
+					Action: []Subject{MultiToken},
+				},
+			},
+			want: []*testUser{
+				newTestUser("5555",
+					withAdded("first name", "last name", "username"),
+					withRemoved(),
+				),
+			},
+			wantErr: false,
+		},
+	}
+	if err := store.Before(ctx, t); err != nil {
+		t.Error("unable to execute store.Before: ", err)
+	}
+	for i := 0; i < 10_000; i++ {
+		_, err := store.Push(ctx,
+			newTestUser(strconv.Itoa(i),
+				withAdded("first name", "last name", "username"),
+				withRemoved(),
+			),
+		)
+		if err != nil {
+			t.Fatalf("unable to push events: %v", err)
+		}
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := store.Filter(ctx, tt.args.filter)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Filter() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			assertEvents(t, tt.want, got)
+		})
+	}
+	if err := store.After(ctx, t); err != nil {
+		t.Error("unable to execute store.After: ", err)
+	}
+}
+
+func FilterBenchTests(ctx context.Context, b *testing.B, store TestEventstore) {
+	type args struct {
+		filter *Filter
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    int
+		wantErr bool
+	}{
+		{
+			name: "multi token",
+			args: args{
+				filter: &Filter{
+					Action: []Subject{TextSubject("user"), TextSubject("5555"), MultiToken},
+				},
+			},
+			want:    2,
+			wantErr: false,
+		},
+		{
+			name: "multiple single tokens",
+			args: args{
+				filter: &Filter{
+					Action: []Subject{TextSubject("user"), SingleToken, SingleToken},
+				},
+			},
+			want:    20_000,
+			wantErr: false,
+		},
+		{
+			name: "all",
+			args: args{
+				filter: &Filter{
+					Action: []Subject{
+						TextSubject("user"),
+						TextSubject("5555"),
+						TextSubject("added"),
+					},
+				},
+			},
+			want:    1,
+			wantErr: false,
+		},
+		{
+			name: "multi token at beginning",
+			args: args{
+				filter: &Filter{
+					Action: []Subject{MultiToken},
+				},
+			},
+			want:    20_000,
+			wantErr: false,
+		},
+		{
+			name: "all added",
+			args: args{
+				filter: &Filter{
+					Action: []Subject{TextSubject("user"), SingleToken, TextSubject("added")},
+				},
+			},
+			want:    10_000,
+			wantErr: false,
+		},
+	}
+	if err := store.Before(ctx, b); err != nil {
+		b.Error("unable to execute store.Before: ", err)
+	}
+	for i := 0; i < 10_000; i++ {
+		_, err := store.Push(ctx,
+			newTestUser(strconv.Itoa(i),
+				withAdded("first name", "last name", "username"),
+				withRemoved(),
+			),
+		)
+		if err != nil {
+			b.Fatalf("unable to push events: %v", err)
+		}
+	}
+	b.ResetTimer()
+	for _, tt := range tests {
+		b.Run(tt.name, func(b *testing.B) {
+			b.RunParallel(func(p *testing.PB) {
+				for n := 0; p.Next(); n++ {
+					got, err := store.Filter(ctx, tt.args.filter)
+					if (err != nil) != tt.wantErr {
+						b.Errorf("Filter() error = %v, wantErr %v", err, tt.wantErr)
+						return
+					}
+					if len(got) != tt.want {
+						b.Errorf("unexpected amount of events. want: %d, got %d", tt.want, len(got))
+					}
+				}
+			})
+		})
+	}
+	if err := store.After(ctx, b); err != nil {
+		b.Error("unable to execute store.After: ", err)
+	}
+}
 
 type eventAsserter interface {
 	assertEvent(t *testing.T, e Event) bool
@@ -555,7 +666,6 @@ func assertEvents(t *testing.T, want []*testUser, got []Event) (failed bool) {
 	var index int
 	for _, testUser := range want {
 		for _, command := range testUser.commands {
-			fmt.Println("actions:", command.Action(), got[index].Action())
 			asserter, ok := command.(eventAsserter)
 			if !ok {
 				t.Fatalf("test command is not assertable: %v", command.Action())

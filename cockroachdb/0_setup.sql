@@ -11,6 +11,6 @@ CREATE TABLE IF NOT EXISTS eventstore.events (
     , in_tx_order INT4 NOT NULL
 
     , PRIMARY KEY ("aggregate", "sequence" DESC)
-    , INDEX filter_aggregate ("position", in_tx_order) INCLUDE ("action", revision, payload, created_at)
+    , INDEX filter_aggregate ("aggregate", "position", in_tx_order) INCLUDE ("action", revision, payload, created_at)
     , INDEX filter_action ("action", "position", in_tx_order) INCLUDE (revision, payload, created_at)
 );

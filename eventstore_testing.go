@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"reflect"
 	"strconv"
+	"strings"
 	"sync/atomic"
 	"testing"
 )
@@ -429,7 +430,8 @@ func PushParallelOnDifferentAggregates(ctx context.Context, b *testing.B, store 
 		for p.Next() {
 
 			i := n.Add(1)
-			user := newTestUser(b.Name()+strconv.Itoa(int(i)),
+
+			user := newTestUser(strings.ReplaceAll(b.Name(), "/", "-")+strconv.Itoa(int(i)),
 				withAdded("first name", "last name", "username"),
 				withRemoved(),
 			)

@@ -10,14 +10,14 @@ import (
 // and filters the stored events
 type Eventstore interface {
 	// Health checks if the storage is available
-	Ready(context.Context) error
+	Ready(ctx context.Context) error
 	// Push stores the command's and returns the resulting Event's
 	// the command's should be stored in a single transaction
 	// if the current sequence of an [AggregatePredefinedSequence] does not match
 	// [ErrSequenceNotMatched] is returned
 	Push(ctx context.Context, aggregates ...Aggregate) ([]Event, error)
 	// Filter returns the events matching the subject
-	Filter(context.Context, *Filter) ([]Event, error)
+	Filter(ctx context.Context, filter *Filter) ([]Event, error)
 }
 
 // Aggregate represents the stream the events are written to

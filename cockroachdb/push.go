@@ -10,7 +10,6 @@ import (
 	"strings"
 	"text/template"
 
-	// crdbpgx "github.com/cockroachdb/cockroach-go/v2/crdb/crdbpgxv5"
 	"github.com/jackc/pgx/v5"
 
 	"github.com/adlerhurst/eventstore/v0"
@@ -20,17 +19,20 @@ var (
 	//go:embed push.sql
 	pushStmt string
 	//go:embed push_current_sequences.sql
-	pushtCurrentSequencesStmt string
+	pushCurrentSequencesStmt string
+	//go:embed push_actions.sql
+	pushActionsStmt string
 )
 
 // Push implements [eventstore.Eventstore]
 func (crdb *CockroachDB) Push(ctx context.Context, aggregates ...eventstore.Aggregate) (result []eventstore.Event, err error) {
 	indexes := prepareIndexes(aggregates)
 
-	events, err := eventsFromAggregates(aggregates)
+	events, close, err := eventsFromAggregates(ctx, aggregates)
 	if err != nil {
 		return nil, err
 	}
+	defer close()
 
 	conn, err := crdb.client.Acquire(ctx)
 	if err != nil {
@@ -66,7 +68,7 @@ func currentSequences(ctx context.Context, tx pgx.Tx, indexes *aggregateIndexes)
 			Funcs(template.FuncMap{
 				"currentSequencesClauses": indexes.currentSequencesClauses,
 			}).
-			Parse(pushtCurrentSequencesStmt))
+			Parse(pushCurrentSequencesStmt))
 
 	buf := bytes.NewBuffer(nil)
 	if err := tmpl.Execute(buf, nil); err != nil {
@@ -99,7 +101,7 @@ func currentSequences(ctx context.Context, tx pgx.Tx, indexes *aggregateIndexes)
 	return nil
 }
 
-func push(ctx context.Context, tx pgx.Tx, indexes *aggregateIndexes, events []*Event) ([]eventstore.Event, error) {
+func push(ctx context.Context, tx pgx.Tx, indexes *aggregateIndexes, events []*event) ([]eventstore.Event, error) {
 	pushTmpl := template.
 		Must(template.New("push").
 			Funcs(template.FuncMap{
@@ -112,8 +114,12 @@ func push(ctx context.Context, tx pgx.Tx, indexes *aggregateIndexes, events []*E
 		panic(err)
 	}
 
-	args := make([]interface{}, 0, len(events)*6)
+	args := make([]any, 0, len(events)*6)
 	result := make([]eventstore.Event, len(events))
+
+	actionArgs := make([]any, 0, len(events)*4)
+	actionParams := make([]string, 0, len(events)*4)
+	var actionIdx int
 
 	for i, event := range events {
 		event.sequence = indexes.increment(event.Aggregate())
@@ -126,6 +132,18 @@ func push(ctx context.Context, tx pgx.Tx, indexes *aggregateIndexes, events []*E
 			i,
 		)
 		result[i] = event
+
+		for i, action := range event.action {
+			actionArgs = append(actionArgs,
+				event.aggregate,
+				event.sequence,
+				action,
+				i,
+				len(event.action),
+			)
+			actionParams = append(actionParams, fmt.Sprintf("($%d, $%d, $%d, $%d, $%d)", actionIdx+1, actionIdx+2, actionIdx+3, actionIdx+4, actionIdx+5))
+			actionIdx += 5
+		}
 	}
 
 	rows, err := tx.Query(ctx, buf.String(), args...)
@@ -138,6 +156,11 @@ func push(ctx context.Context, tx pgx.Tx, indexes *aggregateIndexes, events []*E
 		if err = rows.Scan(&events[i].creationDate, &events[i].position); err != nil {
 			return nil, fmt.Errorf("push failed: %w", err)
 		}
+	}
+
+	_, err = tx.Exec(ctx, fmt.Sprintf(pushActionsStmt, strings.Join(actionParams, ", ")), actionArgs...)
+	if err != nil {
+		return nil, err
 	}
 
 	if rows.Err() != nil {
@@ -202,8 +225,8 @@ func (indexes *aggregateIndexes) increment(aggregate eventstore.TextSubjects) ui
 	return index.index
 }
 
-func (indexes *aggregateIndexes) toAggregateArgs() []interface{} {
-	args := make([]interface{}, len(indexes.aggregates))
+func (indexes *aggregateIndexes) toAggregateArgs() []any {
+	args := make([]any, len(indexes.aggregates))
 
 	for i, index := range indexes.aggregates {
 		args[i] = index.aggregate

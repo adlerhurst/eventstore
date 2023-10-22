@@ -9,15 +9,15 @@ import (
 // Eventstore abstracts all functions needed to store events
 // and filters the stored events
 type Eventstore interface {
-	// Health checks if the storage is available
+	// Ready checks if the storage is available
 	Ready(ctx context.Context) error
 	// Push stores the command's and returns the resulting Event's
-	// the command's should be stored in a single transaction
+	// the commands should be stored in a single transaction
 	// if the current sequence of an [AggregatePredefinedSequence] does not match
 	// [ErrSequenceNotMatched] is returned
 	Push(ctx context.Context, aggregates ...Aggregate) ([]Event, error)
 	// Filter returns the events matching the subject
-	Filter(ctx context.Context, filter *Filter) ([]Event, error)
+	Filter(ctx context.Context, filter *Filter, reducer Reducer) error
 }
 
 // Aggregate represents the stream the events are written to
@@ -34,7 +34,7 @@ type Aggregate interface {
 // If the order doesn't matter the command must not implement this interface
 type AggregatePredefinedSequence interface {
 	Command
-	// CrrentSequence returns the current sequence of the aggregate
+	// CurrentSequence returns the current sequence of the aggregate
 	// If it's the first command return 0
 	// If it's the nth command return the specific sequence
 	CurrentSequence() uint32
@@ -100,6 +100,12 @@ type SequenceFilter struct {
 type CreatedAtFilter struct {
 	From time.Time
 	To   time.Time
+}
+
+// Reducer represents a model
+type Reducer interface {
+	// Reduce maps events to a model
+	Reduce(events ...Event) error
 }
 
 var (

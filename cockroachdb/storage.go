@@ -7,6 +7,7 @@ import (
 
 	"github.com/adlerhurst/eventstore/v0"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"log/slog"
 )
 
 func init() {
@@ -14,16 +15,24 @@ func init() {
 }
 
 type Config struct {
-	Pool *pgxpool.Pool
+	Pool   *pgxpool.Pool
+	logger *slog.Logger
 }
 
-var _ eventstore.Eventstore = (*CockroachDB)(nil)
+var (
+	_         eventstore.Eventstore = (*CockroachDB)(nil)
+	logger                          = slog.Default()
+	eventPool                       = eventstore.NewEventPool[*event]()
+)
 
 type CockroachDB struct {
 	client *pgxpool.Pool
 }
 
 func New(config *Config) *CockroachDB {
+	if config.logger != nil {
+		logger = config.logger
+	}
 	return &CockroachDB{
 		config.Pool,
 	}

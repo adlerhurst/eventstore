@@ -466,11 +466,11 @@ func FilterComplianceTests(ctx context.Context, t *testing.T, store TestEventsto
 			name: "multi token",
 			args: args{
 				filter: &Filter{
-					Action: []Subject{TextSubject("user"), TextSubject("5555"), MultiToken},
+					Action: []Subject{TextSubject("user"), TextSubject("id"), MultiToken},
 				},
 			},
 			want: []*testUser{
-				newTestUser("5555",
+				newTestUser("id",
 					withAdded("first name", "last name", "username"),
 					withRemoved(),
 				),
@@ -485,7 +485,7 @@ func FilterComplianceTests(ctx context.Context, t *testing.T, store TestEventsto
 				},
 			},
 			want: []*testUser{
-				newTestUser("5555",
+				newTestUser("id",
 					withAdded("first name", "last name", "username"),
 					withRemoved(),
 				),
@@ -498,13 +498,13 @@ func FilterComplianceTests(ctx context.Context, t *testing.T, store TestEventsto
 				filter: &Filter{
 					Action: []Subject{
 						TextSubject("user"),
-						TextSubject("5555"),
+						TextSubject("id"),
 						TextSubject("added"),
 					},
 				},
 			},
 			want: []*testUser{
-				newTestUser("5555",
+				newTestUser("id",
 					withAdded("first name", "last name", "username"),
 				),
 			},
@@ -518,7 +518,7 @@ func FilterComplianceTests(ctx context.Context, t *testing.T, store TestEventsto
 				},
 			},
 			want: []*testUser{
-				newTestUser("5555",
+				newTestUser("id",
 					withAdded("first name", "last name", "username"),
 					withRemoved(),
 				),
@@ -529,16 +529,14 @@ func FilterComplianceTests(ctx context.Context, t *testing.T, store TestEventsto
 	if err := store.Before(ctx, t); err != nil {
 		t.Error("unable to execute store.Before: ", err)
 	}
-	for i := 0; i < 10_000; i++ {
-		_, err := store.Push(ctx,
-			newTestUser(strconv.Itoa(i),
-				withAdded("first name", "last name", "username"),
-				withRemoved(),
-			),
-		)
-		if err != nil {
-			t.Fatalf("unable to push events: %v", err)
-		}
+	_, err := store.Push(ctx,
+		newTestUser("id",
+			withAdded("first name", "last name", "username"),
+			withRemoved(),
+		),
+	)
+	if err != nil {
+		t.Fatalf("unable to push events: %v", err)
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

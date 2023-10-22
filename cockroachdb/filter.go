@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	_ "embed"
-	"fmt"
 	"strconv"
 	"strings"
 	"text/template"
@@ -20,14 +19,15 @@ var (
 )
 
 // Filter implements [eventstore.Eventstore]
-func (crdb *CockroachDB) Filter(ctx context.Context, filter *eventstore.Filter) (events []eventstore.Event, err error) {
+func (crdb *CockroachDB) Filter(ctx context.Context, filter *eventstore.Filter, reducer eventstore.Reducer) (err error) {
 	query, args := prepareStatement(filter)
 
 	tx, err := crdb.client.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.ReadCommitted, AccessMode: pgx.ReadOnly})
 	if err != nil {
-		return nil, err
+		return err
 	}
 	defer func() {
+		// errors are not handled because it's a read-only transaction
 		if err != nil {
 			_ = tx.Rollback(ctx)
 			return
@@ -37,12 +37,12 @@ func (crdb *CockroachDB) Filter(ctx context.Context, filter *eventstore.Filter) 
 
 	rows, err := tx.Query(ctx, query, args...)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	defer rows.Close()
 
 	for rows.Next() {
-		event := new(Event)
+		event := eventPool.Get()
 		err = rows.Scan(
 			&event.aggregate,
 			&event.action,
@@ -53,13 +53,21 @@ func (crdb *CockroachDB) Filter(ctx context.Context, filter *eventstore.Filter) 
 			&event.position,
 		)
 		if err != nil {
-			return nil, err
+			event.payload = nil
+			eventPool.Put(event)
+			return err
 		}
 
-		events = append(events, event)
+		if err = reducer.Reduce(event); err != nil {
+			event.payload = nil
+			eventPool.Put(event)
+			return err
+		}
+		event.payload = nil
+		eventPool.Put(event)
 	}
 
-	return events, nil
+	return nil
 }
 
 type filterData struct {
@@ -102,19 +110,19 @@ func filterToClauses(filter *eventstore.Filter) (clauses []string, args []interf
 	args = make([]interface{}, 0, 4)
 
 	if !filter.CreatedAt.From.IsZero() {
-		clauses = append(clauses, "created_at >= ?")
+		clauses = append(clauses, "e.created_at >= ?")
 		args = append(args, filter.CreatedAt.From)
 	}
 	if !filter.CreatedAt.To.IsZero() {
-		clauses = append(clauses, "created_at <= ?")
+		clauses = append(clauses, "e.created_at <= ?")
 		args = append(args, filter.CreatedAt.To)
 	}
 	if filter.Sequence.From > 0 {
-		clauses = append(clauses, "sequence >= ?")
+		clauses = append(clauses, "e.sequence >= ?")
 		args = append(args, filter.Sequence.From)
 	}
 	if filter.Sequence.To > 0 {
-		clauses = append(clauses, "sequence <= ?")
+		clauses = append(clauses, "e.sequence <= ?")
 		args = append(args, filter.Sequence.To)
 	}
 	if len(filter.Action) > 0 {
@@ -132,17 +140,15 @@ func actionToClauses(action []eventstore.Subject) (clauses []string, args []inte
 		case eventstore.SingleToken:
 			continue
 		case eventstore.MultiToken:
-			clauses = append(clauses, "cardinality(\"action\") >= ?")
 			args = append(args, len(action)-1)
-			return clauses, args
+			return []string{"(" + strings.Join(clauses, " OR ") + ")", `a."cardinality" >= ?`}, args
 		default:
-			clauses = append(clauses, fmt.Sprintf("\"action\"[%d] = ?", i+1))
-			args = append(args, a)
+			clauses = append(clauses, `(a."action" = ? AND a."index" = ?)`)
+			args = append(args, a, i)
 		}
 	}
 
-	clauses = append(clauses, "cardinality(\"action\") = ?")
 	args = append(args, len(action))
 
-	return clauses, args
+	return []string{"(" + strings.Join(clauses, " OR ") + ")", `a."cardinality" >= ?`}, args
 }

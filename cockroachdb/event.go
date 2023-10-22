@@ -1,15 +1,16 @@
 package cockroachdb
 
 import (
+	"context"
 	"encoding/json"
 	"time"
 
 	"github.com/adlerhurst/eventstore/v0"
 )
 
-var _ eventstore.Event = (*Event)(nil)
+var _ eventstore.Event = (*event)(nil)
 
-type Event struct {
+type event struct {
 	action       eventstore.TextSubjects
 	aggregate    eventstore.TextSubjects
 	revision     uint16
@@ -20,63 +21,71 @@ type Event struct {
 }
 
 // Action implements [eventstore.Event]
-func (e *Event) Action() eventstore.TextSubjects {
+func (e *event) Action() eventstore.TextSubjects {
 	return e.action
 }
 
 // Aggregate implements [eventstore.Event]
-func (e *Event) Aggregate() eventstore.TextSubjects {
+func (e *event) Aggregate() eventstore.TextSubjects {
 	return e.aggregate
 }
 
 // Revision implements [eventstore.Event]
-func (e *Event) Revision() uint16 {
+func (e *event) Revision() uint16 {
 	return e.revision
 }
 
 // CreationDate implements [eventstore.Event]
-func (e *Event) CreationDate() time.Time {
+func (e *event) CreationDate() time.Time {
 	return e.creationDate
 }
 
 // Sequence implements [eventstore.Event]
-func (e *Event) Sequence() uint64 {
+func (e *event) Sequence() uint64 {
 	return uint64(e.sequence)
 }
 
 // UnmarshalPayload implements [eventstore.Event]
-func (e *Event) UnmarshalPayload(object any) error {
+func (e *event) UnmarshalPayload(object any) error {
 	if len(e.payload) == 0 {
 		return nil
 	}
 	return json.Unmarshal(e.payload, object)
 }
 
-func eventsFromAggregates(aggregates []eventstore.Aggregate) (events []*Event, err error) {
-	events = make([]*Event, 0, len(aggregates))
+func eventsFromAggregates(ctx context.Context, aggregates []eventstore.Aggregate) (events []*event, close func(), err error) {
+	events = make([]*event, 0, len(aggregates))
 	for _, aggregate := range aggregates {
-		aggregateEvents, err := eventsFromAggregate(aggregate)
+		aggregateEvents, err := eventsFromAggregate(ctx, aggregate)
 		if err != nil {
-			return nil, err
+			return nil, func() {}, err
 		}
 		events = append(events, aggregateEvents...)
 	}
 
-	return events, nil
+	return events,
+		func() {
+			for _, e := range events {
+				e.payload = nil
+				eventPool.Put(e)
+			}
+		},
+		nil
 }
 
-func eventsFromAggregate(aggregate eventstore.Aggregate) ([]*Event, error) {
-	events := make([]*Event, len(aggregate.Commands()))
+func eventsFromAggregate(ctx context.Context, aggregate eventstore.Aggregate) ([]*event, error) {
+	events := make([]*event, len(aggregate.Commands()))
 	for i, command := range aggregate.Commands() {
-		events[i] = &Event{
-			aggregate: aggregate.ID(),
-			action:    command.Action(),
-			revision:  command.Revision(),
-		}
+		events[i] = eventPool.Get()
+
+		events[i].aggregate = aggregate.ID()
+		events[i].action = command.Action()
+		events[i].revision = command.Revision()
 
 		if command.Payload() != nil {
 			payload, err := json.Marshal(command.Payload())
 			if err != nil {
+				logger.ErrorContext(ctx, "marshal payload failed", "cause", err, "action", events[i].action.Join("."))
 				return nil, err
 			}
 			if len(payload) > 0 {

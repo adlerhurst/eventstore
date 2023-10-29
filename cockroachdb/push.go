@@ -1,48 +1,38 @@
 package cockroachdb
 
 import (
-	"bytes"
 	"context"
 	_ "embed"
 	"fmt"
 	"reflect"
 	"strconv"
 	"strings"
-	"text/template"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 
 	"github.com/adlerhurst/eventstore/v0"
 )
 
-var (
-	//go:embed push.sql
-	pushStmt string
-	//go:embed push_current_sequences.sql
-	pushCurrentSequencesStmt string
-	//go:embed push_actions.sql
-	pushActionsStmt string
-)
-
 // Push implements [eventstore.Eventstore]
-func (crdb *CockroachDB) Push(ctx context.Context, aggregates ...eventstore.Aggregate) (result []eventstore.Event, err error) {
+func (crdb *CockroachDB) Push(ctx context.Context, aggregates ...eventstore.Aggregate) (err error) {
 	indexes := prepareIndexes(aggregates)
 
-	events, close, err := eventsFromAggregates(ctx, aggregates)
+	commands, close, err := commandsFromAggregates(ctx, aggregates)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	defer close()
 
 	conn, err := crdb.client.Acquire(ctx)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	defer conn.Release()
 
 	tx, err := conn.Begin(ctx)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	defer func() {
 		if err != nil {
@@ -50,32 +40,27 @@ func (crdb *CockroachDB) Push(ctx context.Context, aggregates ...eventstore.Aggr
 			return
 		}
 		err = tx.Commit(ctx)
-		if err != nil {
-			result = nil
-		}
 	}()
 
 	if err = currentSequences(ctx, tx, indexes); err != nil {
-		return nil, err
+		return err
 	}
 
-	return push(ctx, tx, indexes, events)
+	return push(ctx, tx, indexes, commands)
 }
 
+var (
+	currentSequencesPrefix = []byte(`SELECT "sequence", "aggregate" FROM eventstore.events WHERE ("sequence", "aggregate") IN (SELECT (max("sequence"), "aggregate") FROM eventstore.events WHERE `)
+	currentSequencesSuffix = []byte(` GROUP BY "aggregate") FOR UPDATE`)
+)
+
 func currentSequences(ctx context.Context, tx pgx.Tx, indexes *aggregateIndexes) (err error) {
-	tmpl := template.
-		Must(template.New("push").
-			Funcs(template.FuncMap{
-				"currentSequencesClauses": indexes.currentSequencesClauses,
-			}).
-			Parse(pushCurrentSequencesStmt))
+	var builder strings.Builder
+	builder.Write(currentSequencesPrefix)
+	indexes.currentSequencesClauses(&builder)
+	builder.Write(currentSequencesSuffix)
 
-	buf := bytes.NewBuffer(nil)
-	if err := tmpl.Execute(buf, nil); err != nil {
-		panic(err)
-	}
-
-	rows, err := tx.Query(ctx, buf.String(), indexes.toAggregateArgs()...)
+	rows, err := tx.Query(ctx, builder.String(), indexes.toAggregateArgs()...)
 	if err != nil {
 		return err
 	}
@@ -91,82 +76,62 @@ func currentSequences(ctx context.Context, tx pgx.Tx, indexes *aggregateIndexes)
 			return err
 		}
 
-		index := indexes.byAggregate(aggregate)
-		if index.shouldCheckSequence && index.sequence != sequence {
+		aggIdx := indexes.byAggregate(aggregate)
+		aggIdx.index = sequence
+	}
+
+	// check is not made during scan to verify that non existing aggregates are also checked
+	for _, aggregate := range indexes.aggregates {
+		if aggregate.shouldCheckSequence && aggregate.index != aggregate.expectedSequence {
 			return eventstore.ErrSequenceNotMatched
 		}
-		index.index = sequence
 	}
 
 	return nil
 }
 
-func push(ctx context.Context, tx pgx.Tx, indexes *aggregateIndexes, events []*event) ([]eventstore.Event, error) {
-	pushTmpl := template.
-		Must(template.New("push").
-			Funcs(template.FuncMap{
-				"insertValues": indexes.toValues,
-			}).
-			Parse(pushStmt))
+var (
+	pushEventsPrefix = []byte(`WITH computed AS (SELECT hlc_to_timestamp(cluster_logical_timestamp()) created_at, cluster_logical_timestamp() "position"), input ("aggregate", "action", revision, payload, "sequence", in_tx_order) AS (VALUES `)
+	pushEventsSuffix = []byte(`) INSERT INTO eventstore.events (created_at, "position", "aggregate", "action", revision, payload, "sequence", in_tx_order) SELECT c.created_at, c."position", i."aggregate", i."action", i.revision, i.payload, i."sequence", i.in_tx_order FROM input i, computed c RETURNING id, created_at`)
 
-	buf := bytes.NewBuffer(nil)
-	if err := pushTmpl.Execute(buf, nil); err != nil {
-		panic(err)
-	}
+	pushActionsPrefix = []byte(`INSERT INTO eventstore.actions ("event", "action", depth) VALUES `)
+)
 
-	args := make([]any, 0, len(events)*6)
-	result := make([]eventstore.Event, len(events))
+func push(ctx context.Context, tx pgx.Tx, indexes *aggregateIndexes, commands []*command) (err error) {
+	var pushBuilder strings.Builder
+	pushBuilder.Write(pushEventsPrefix)
+	eventsArgs := indexes.eventValues(commands, &pushBuilder)
+	pushBuilder.Write(pushEventsSuffix)
 
-	actionArgs := make([]any, 0, len(events)*4)
-	actionParams := make([]string, 0, len(events)*4)
-	var actionIdx int
-
-	for i, event := range events {
-		event.sequence = indexes.increment(event.Aggregate())
-		args = append(args,
-			event.aggregate,
-			event.action,
-			event.revision,
-			event.payload,
-			event.sequence,
-			i,
-		)
-		result[i] = event
-
-		for i, action := range event.action {
-			actionArgs = append(actionArgs,
-				event.aggregate,
-				event.sequence,
-				action,
-				i,
-				len(event.action),
-			)
-			actionParams = append(actionParams, fmt.Sprintf("($%d, $%d, $%d, $%d, $%d)", actionIdx+1, actionIdx+2, actionIdx+3, actionIdx+4, actionIdx+5))
-			actionIdx += 5
-		}
-	}
-
-	rows, err := tx.Query(ctx, buf.String(), args...)
+	rows, err := tx.Query(ctx, pushBuilder.String(), eventsArgs...)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	defer rows.Close()
 
 	for i := 0; rows.Next(); i++ {
-		if err = rows.Scan(&events[i].creationDate, &events[i].position); err != nil {
-			return nil, fmt.Errorf("push failed: %w", err)
+		var creationDate time.Time
+
+		if err = rows.Scan(&commands[i].id, &creationDate); err != nil {
+			return fmt.Errorf("push failed: %w", err)
 		}
+		commands[i].SetCreationDate(creationDate)
+		commands[i].SetSequence(commands[i].sequence)
 	}
 
-	_, err = tx.Exec(ctx, fmt.Sprintf(pushActionsStmt, strings.Join(actionParams, ", ")), actionArgs...)
+	var actionBuilder strings.Builder
+	actionBuilder.Write(pushActionsPrefix)
+	actionsArgs := actionValues(commands, &actionBuilder)
+
+	_, err = tx.Exec(ctx, actionBuilder.String(), actionsArgs...)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	if rows.Err() != nil {
-		return nil, rows.Err()
+		return rows.Err()
 	}
-	return result, nil
+	return nil
 }
 
 func prepareIndexes(aggregates []eventstore.Aggregate) *aggregateIndexes {
@@ -175,7 +140,6 @@ func prepareIndexes(aggregates []eventstore.Aggregate) *aggregateIndexes {
 	}
 
 	for _, aggregate := range aggregates {
-		indexes.commandCount += len(aggregate.Commands())
 		index := indexes.byAggregate(aggregate.ID())
 		if index != nil {
 			continue
@@ -186,7 +150,7 @@ func prepareIndexes(aggregates []eventstore.Aggregate) *aggregateIndexes {
 		sequenceChecker, ok := aggregate.(eventstore.AggregatePredefinedSequence)
 		if ok {
 			index.shouldCheckSequence = true
-			index.sequence = sequenceChecker.CurrentSequence()
+			index.expectedSequence = sequenceChecker.CurrentSequence()
 		}
 		indexes.aggregates = append(indexes.aggregates, index)
 	}
@@ -195,15 +159,14 @@ func prepareIndexes(aggregates []eventstore.Aggregate) *aggregateIndexes {
 }
 
 type aggregateIndexes struct {
-	aggregates   []*aggregateIndex
-	commandCount int
+	aggregates []*aggregateIndex
 }
 
 type aggregateIndex struct {
 	aggregate           eventstore.TextSubjects
 	index               uint32
 	shouldCheckSequence bool
-	sequence            uint32
+	expectedSequence    uint32
 }
 
 func (indexes *aggregateIndexes) byAggregate(aggregate eventstore.TextSubjects) *aggregateIndex {
@@ -235,23 +198,126 @@ func (indexes *aggregateIndexes) toAggregateArgs() []any {
 	return args
 }
 
-func (indexes *aggregateIndexes) currentSequencesClauses() string {
-	clauses := make([]string, len(indexes.aggregates))
+var (
+	or = []byte(" OR ")
+)
 
+func (indexes *aggregateIndexes) currentSequencesClauses(builder *strings.Builder) {
 	for i := range indexes.aggregates {
-		clauses[i] = `"aggregate" = $` + strconv.Itoa(i+1)
+		builder.Write([]byte(`"aggregate" = $` + strconv.Itoa(i+1)))
+		if i+1 < len(indexes.aggregates) {
+			builder.Write(or)
+		}
 	}
-
-	return strings.Join(clauses, " OR ")
 }
 
-func (indexes *aggregateIndexes) toValues() string {
-	values := make([]string, indexes.commandCount)
-	var index = 0
-	for i := 0; i < indexes.commandCount; i++ {
-		values[i] = fmt.Sprintf("($%d::TEXT[], $%d::TEXT[], $%d::INT2, $%d::JSONB, $%d::INT4, $%d::INT4)", index+1, index+2, index+3, index+4, index+5, index+6)
+var (
+	uuidCast      = []byte("::UUID")
+	textCast      = []byte("::TEXT")
+	textArrayCast = []byte("::TEXT[]")
+	smallIntCast  = []byte("::INT2")
+	intCast       = []byte("::INT4")
+	jsonbCast     = []byte("::JSONB")
+)
+
+func (indexes *aggregateIndexes) eventValues(commands []*command, builder *strings.Builder) []any {
+	var (
+		index = 0
+		args  = make([]any, 0, len(commands)*6)
+	)
+
+	for i := 0; i < len(commands); i++ {
+		builder.WriteRune('(')
+
+		builder.WriteRune('$')
+		builder.Write([]byte(strconv.Itoa(index + 1)))
+		builder.Write(textArrayCast)
+		builder.WriteRune(',')
+
+		builder.WriteRune('$')
+		builder.Write([]byte(strconv.Itoa(index + 2)))
+		builder.Write(textArrayCast)
+		builder.WriteRune(',')
+
+		builder.WriteRune('$')
+		builder.Write([]byte(strconv.Itoa(index + 3)))
+		builder.Write(smallIntCast)
+		builder.WriteRune(',')
+
+		builder.WriteRune('$')
+		builder.Write([]byte(strconv.Itoa(index + 4)))
+		builder.Write(jsonbCast)
+		builder.WriteRune(',')
+
+		builder.WriteRune('$')
+		builder.Write([]byte(strconv.Itoa(index + 5)))
+		builder.Write(intCast)
+		builder.WriteRune(',')
+
+		builder.WriteRune('$')
+		builder.Write([]byte(strconv.Itoa(index + 6)))
+		builder.Write(intCast)
+
+		builder.WriteRune(')')
+
+		if i+1 < len(commands) {
+			builder.WriteRune(',')
+		}
 		index += 6
+
+		commands[i].sequence = indexes.increment(commands[i].aggregate)
+		args = append(args,
+			commands[i].aggregate,
+			commands[i].Action(),
+			commands[i].Revision(),
+			commands[i].payload,
+			commands[i].sequence,
+			i,
+		)
 	}
 
-	return strings.Join(values, ", ")
+	return args
+}
+
+func actionValues(commands []*command, builder *strings.Builder) []any {
+	var (
+		index = 0
+		args  = make([]any, 0, len(commands)*3)
+	)
+
+	for cmdCount, cmd := range commands {
+		for depth, a := range cmd.Action() {
+			builder.WriteRune('(')
+
+			builder.WriteRune('$')
+			builder.Write([]byte(strconv.Itoa(index + 1)))
+			builder.Write(uuidCast)
+			builder.WriteRune(',')
+
+			builder.WriteRune('$')
+			builder.Write([]byte(strconv.Itoa(index + 2)))
+			builder.Write(textCast)
+			builder.WriteRune(',')
+
+			builder.WriteRune('$')
+			builder.Write([]byte(strconv.Itoa(index + 3)))
+			builder.Write(smallIntCast)
+
+			builder.WriteRune(')')
+
+			if depth+1 < len(cmd.Action()) || cmdCount+1 < len(commands) {
+				builder.WriteRune(',')
+			}
+
+			index += 3
+
+			args = append(args,
+				cmd.id,
+				a,
+				depth,
+			)
+		}
+	}
+
+	return args
 }

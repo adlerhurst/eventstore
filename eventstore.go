@@ -15,7 +15,7 @@ type Eventstore interface {
 	// the commands should be stored in a single transaction
 	// if the current sequence of an [AggregatePredefinedSequence] does not match
 	// [ErrSequenceNotMatched] is returned
-	Push(ctx context.Context, aggregates ...Aggregate) ([]Event, error)
+	Push(ctx context.Context, aggregates ...Aggregate) error
 	// Filter returns the events matching the subject
 	Filter(ctx context.Context, filter *Filter, reducer Reducer) error
 }
@@ -33,7 +33,7 @@ type Aggregate interface {
 // AggregatePredefinedSequence is used in storage to determine if the command requires a specific sequence
 // If the order doesn't matter the command must not implement this interface
 type AggregatePredefinedSequence interface {
-	Command
+	Aggregate
 	// CurrentSequence returns the current sequence of the aggregate
 	// If it's the first command return 0
 	// If it's the nth command return the specific sequence
@@ -62,6 +62,9 @@ type Command interface {
 	// - struct which can be marshalled
 	// - pointer to struct which can be marshalled
 	Payload() any
+
+	SetSequence(sequence uint32)
+	SetCreationDate(creationDate time.Time)
 }
 
 // Event is the abstraction if a user wants to get events mapped by the eventstore

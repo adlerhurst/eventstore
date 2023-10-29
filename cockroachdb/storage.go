@@ -3,11 +3,13 @@ package cockroachdb
 import (
 	"context"
 	_ "embed"
+	"log/slog"
 	"text/template"
 
-	"github.com/adlerhurst/eventstore/v0"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"log/slog"
+
+	"github.com/adlerhurst/eventstore/v0"
+	"github.com/adlerhurst/eventstore/v0/x"
 )
 
 func init() {
@@ -20,9 +22,10 @@ type Config struct {
 }
 
 var (
-	_         eventstore.Eventstore = (*CockroachDB)(nil)
-	logger                          = slog.Default()
-	eventPool                       = eventstore.NewEventPool[*event]()
+	_           eventstore.Eventstore = (*CockroachDB)(nil)
+	logger                            = slog.Default()
+	eventPool                         = x.NewPool[event]()
+	commandPool                       = x.NewPool[command]()
 )
 
 type CockroachDB struct {

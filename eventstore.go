@@ -11,12 +11,12 @@ import (
 type Eventstore interface {
 	// Ready checks if the storage is available
 	Ready(ctx context.Context) error
-	// Push stores the command's and returns the resulting Event's
+	// Push stores the commands and sets the resulting metadata on the command
 	// the commands should be stored in a single transaction
 	// if the current sequence of an [AggregatePredefinedSequence] does not match
 	// [ErrSequenceNotMatched] is returned
 	Push(ctx context.Context, aggregates ...Aggregate) error
-	// Filter returns the events matching the subject
+	// Filter applies the events matching the subjects on the reducer
 	Filter(ctx context.Context, filter *Filter, reducer Reducer) error
 }
 

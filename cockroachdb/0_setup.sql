@@ -1,8 +1,9 @@
 CREATE SCHEMA IF NOT EXISTS eventstore;
 
 CREATE TABLE IF NOT EXISTS eventstore.events (
-    "aggregate" TEXT[] NOT NULL
-    , "action" TEXT[] NOT NULL
+    id UUID NOT NULL DEFAULT gen_random_uuid()
+
+    , "aggregate" TEXT[] NOT NULL
     , revision INT2 NOT NULL
     , payload JSONB
     , "sequence" INT4 NOT NULL
@@ -10,7 +11,19 @@ CREATE TABLE IF NOT EXISTS eventstore.events (
     , "position" DECIMAL NOT NULL
     , in_tx_order INT4 NOT NULL
 
-    , PRIMARY KEY ("aggregate", "sequence" DESC)
-    , INDEX filter_aggregate ("aggregate", "position", in_tx_order) INCLUDE ("action", revision, payload, created_at)
-    , INDEX filter_action ("action", "position", in_tx_order) INCLUDE (revision, payload, created_at)
+    , action TEXT[] NOT NULL
+    , action_depth INT2 AS (array_length(action, 1)) STORED
+
+    , PRIMARY KEY (id)
+    , UNIQUE ("aggregate", "sequence")
+);
+
+CREATE TABLE IF NOT EXISTS eventstore.actions (
+    "event" UUID
+    , "action" TEXT
+    , depth INT2
+
+    , PRIMARY KEY (event, action, depth)
+    , FOREIGN KEY ("event") REFERENCES eventstore.events ON DELETE CASCADE
+    , INDEX search ("action", depth)
 );

@@ -1,33 +1,41 @@
 package cockroachdb
 
 import (
-	"bytes"
 	"context"
 	_ "embed"
-	"fmt"
 	"strconv"
 	"strings"
-	"text/template"
 
 	"github.com/adlerhurst/eventstore/v0"
 	"github.com/jackc/pgx/v5"
 )
 
-var (
-	//go:embed filter.sql
-	filterStmt string
-	filterTmpl *template.Template
-)
-
 // Filter implements [eventstore.Eventstore]
-func (crdb *CockroachDB) Filter(ctx context.Context, filter *eventstore.Filter) (events []eventstore.Event, err error) {
-	query, args := prepareStatement(filter)
+func (store *CockroachDB) Filter(ctx context.Context, filter *eventstore.Filter, reducer eventstore.Reducer) (err error) {
+	builder, args := store.prepareStatement(filter)
 
-	tx, err := crdb.client.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.ReadCommitted, AccessMode: pgx.ReadOnly})
+	conn, err := store.client.Acquire(ctx)
 	if err != nil {
-		return nil, err
+		return err
+	}
+	defer conn.Release()
+
+	// The application_name is required to differentiate between filter and push queries
+	// filter queries are not relevant for the [filterIgnoreOpenPush] clause
+	_, err = conn.Exec(ctx, "SET application_name = $1", store.filterAppName)
+	if err != nil {
+		return err
+	}
+
+	tx, err := conn.BeginTx(ctx, pgx.TxOptions{
+		IsoLevel:   pgx.ReadCommitted,
+		AccessMode: pgx.ReadOnly,
+	})
+	if err != nil {
+		return err
 	}
 	defer func() {
+		// errors are not handled because it's a read-only transaction
 		if err != nil {
 			_ = tx.Rollback(ctx)
 			return
@@ -35,114 +43,213 @@ func (crdb *CockroachDB) Filter(ctx context.Context, filter *eventstore.Filter) 
 		_ = tx.Commit(ctx)
 	}()
 
-	rows, err := tx.Query(ctx, query, args...)
+	rows, err := tx.Query(ctx, builder.String(), args...)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	defer rows.Close()
 
 	for rows.Next() {
-		event := new(Event)
+		event := eventPool.Get()
 		err = rows.Scan(
 			&event.aggregate,
-			&event.action,
 			&event.revision,
 			&event.payload,
 			&event.sequence,
 			&event.creationDate,
-			&event.position,
+			&event.action,
 		)
 		if err != nil {
-			return nil, err
+			event.payload = nil
+			eventPool.Put(event)
+			return err
 		}
 
-		events = append(events, event)
+		if err = reducer.Reduce(event); err != nil {
+			event.payload = nil
+			eventPool.Put(event)
+			return err
+		}
+		event.payload = nil
+		eventPool.Put(event)
 	}
 
-	return events, nil
+	return nil
 }
 
-type filterData struct {
-	Where string
-	Limit string
-}
+var (
+	filterColumnSelector = "SELECT e.aggregate, e.revision, e.payload, e.sequence, e.created_at, e.action FROM eventstore.events e "
+	filterLimit          = " LIMIT $"
+	filterIgnoreOpenPush = `e.created_at < (SELECT COALESCE(MIN(start), NOW())::TIMESTAMPTZ FROM crdb_internal.cluster_transactions where application_name = $`
+)
 
-func prepareStatement(filter *eventstore.Filter) (string, []interface{}) {
-	var data filterData
-	clauses, args := filterToClauses(filter)
+func (store *CockroachDB) prepareStatement(filter *eventstore.Filter) (builder strings.Builder, args []any) {
+	var index int
 
-	if len(clauses) > 0 {
-		data.Where = "WHERE " + strings.Join(clauses, " AND ")
+	builder.WriteString(filterColumnSelector)
+
+	builder.WriteString(" WHERE ")
+	if len(filter.Queries) > 0 {
+		args = queriesToClause(&builder, &index, filter.Queries)
 	}
+
+	if len(args) >= 0 {
+		builder.WriteString(" AND ")
+	}
+	builder.WriteString(filterIgnoreOpenPush)
+	index++
+	builder.WriteString(strconv.Itoa(index))
+	args = append(args, store.pushAppName)
+	builder.WriteString(") ORDER BY e.position, e.in_tx_order")
 
 	if filter.Limit > 0 {
-		data.Limit = "LIMIT ?"
+		builder.WriteString(filterLimit)
+		index++
+		builder.Write([]byte(strconv.Itoa(index)))
 		args = append(args, filter.Limit)
 	}
 
-	buf := bytes.NewBuffer(nil)
-	if err := filterTmpl.Execute(buf, data); err != nil {
-		panic(err)
-	}
-
-	query := buf.String()
-	for i := range args {
-		query = strings.Replace(query, "?", "$"+strconv.Itoa(i+1), 1)
-	}
-
-	return query, args
+	return builder, args
 }
 
-func filterToClauses(filter *eventstore.Filter) (clauses []string, args []interface{}) {
-	if filter == nil {
-		return nil, nil
-	}
+func queriesToClause(builder *strings.Builder, index *int, queries []*eventstore.FilterQuery) (args []any) {
+	for i, query := range queries {
 
-	clauses = make([]string, 0, 4)
-	args = make([]interface{}, 0, 4)
+		args = append(args, queryToClause(builder, index, query)...)
 
-	if !filter.CreatedAt.From.IsZero() {
-		clauses = append(clauses, "created_at >= ?")
-		args = append(args, filter.CreatedAt.From)
-	}
-	if !filter.CreatedAt.To.IsZero() {
-		clauses = append(clauses, "created_at <= ?")
-		args = append(args, filter.CreatedAt.To)
-	}
-	if filter.Sequence.From > 0 {
-		clauses = append(clauses, "sequence >= ?")
-		args = append(args, filter.Sequence.From)
-	}
-	if filter.Sequence.To > 0 {
-		clauses = append(clauses, "sequence <= ?")
-		args = append(args, filter.Sequence.To)
-	}
-	if len(filter.Action) > 0 {
-		c, a := actionToClauses(filter.Action)
-		clauses = append(clauses, c...)
-		args = append(args, a...)
-	}
-
-	return clauses, args
-}
-
-func actionToClauses(action []eventstore.Subject) (clauses []string, args []interface{}) {
-	for i, a := range action {
-		switch a {
-		case eventstore.SingleToken:
-			continue
-		case eventstore.MultiToken:
-			clauses = append(clauses, "cardinality(\"action\") >= ?")
-			args = append(args, len(action)-1)
-			return clauses, args
-		default:
-			clauses = append(clauses, fmt.Sprintf("\"action\"[%d] = ?", i+1))
-			args = append(args, a)
+		if i < len(queries)-1 {
+			builder.WriteString(" OR ")
 		}
 	}
 
-	clauses = append(clauses, "cardinality(\"action\") = ?")
-	args = append(args, len(action))
+	return args
+}
 
-	return clauses, args
+var (
+	filterSequenceGt  = " AND e.sequence > $"
+	filterSequenceLt  = " AND e.sequence < $"
+	filterCreatedAtGt = " AND e.created_at > $"
+	filterCreatedAtLt = " AND e.created_at < $"
+)
+
+func queryToClause(builder *strings.Builder, index *int, query *eventstore.FilterQuery) []any {
+	builder.WriteRune('(')
+
+	args := subjectsToClause(builder, index, query.Subjects)
+
+	if query.Sequence.From > 0 {
+		builder.WriteString(filterSequenceGt)
+		*index++
+		builder.WriteString(strconv.Itoa(*index))
+		args = append(args, query.Sequence.From)
+	}
+
+	if query.Sequence.To > 0 {
+		builder.WriteString(filterSequenceLt)
+		*index++
+		builder.WriteString(strconv.Itoa(*index))
+		args = append(args, query.Sequence.To)
+	}
+
+	if !query.CreatedAt.From.IsZero() {
+		builder.WriteString(filterCreatedAtGt)
+		*index++
+		builder.WriteString(strconv.Itoa(*index))
+		args = append(args, query.CreatedAt.From)
+	}
+
+	if !query.CreatedAt.To.IsZero() {
+		builder.WriteString(filterCreatedAtLt)
+		*index++
+		builder.WriteString(strconv.Itoa(*index))
+		args = append(args, query.CreatedAt.To)
+	}
+
+	builder.WriteRune(')')
+
+	return args
+}
+
+var filterActionsCondition = "e.id IN (SELECT a.event FROM eventstore.actions a"
+
+func subjectsToClause(builder *strings.Builder, index *int, subjects []eventstore.Subject) []any {
+	if len(subjects) == 0 {
+		return nil
+	}
+
+	args := make([]any, 0, len(subjects)*2+1)
+
+	// the loop is used to check if at least 1 subject is a text subject
+	// if so text subject queries are written to builder
+	for _, subject := range subjects {
+		if _, ok := subject.(eventstore.TextSubject); !ok {
+			continue
+		}
+
+		builder.WriteString(filterActionsCondition)
+		args = append(args, subjectsToJoins(builder, index, subjects[1:])...)
+
+		builder.WriteString(" WHERE ")
+		if textSubject, ok := subjects[0].(eventstore.TextSubject); ok {
+			textSubjectClause(builder, index, "a", textSubject)
+			args = append(args, textSubject, 0)
+		}
+		builder.WriteRune(')')
+
+		break
+	}
+
+	if len(args) > 0 {
+		builder.WriteString(" AND ")
+	}
+	actionDepthQuery(builder, index, subjects[len(subjects)-1])
+	args = append(args, len(subjects))
+
+	return args
+}
+
+func subjectsToJoins(builder *strings.Builder, index *int, subjects []eventstore.Subject) []any {
+	args := make([]any, 0, len(subjects)*2)
+	for depth, subject := range subjects {
+		textSubject, ok := subject.(eventstore.TextSubject)
+		if !ok {
+			continue
+		}
+		tableAlias := "a" + strconv.Itoa(depth)
+		builder.WriteString(" JOIN eventstore.actions ")
+		builder.WriteString(tableAlias)
+		builder.WriteString(" ON a.event = ")
+		builder.WriteString(tableAlias)
+		builder.WriteString(".event")
+		builder.WriteString(" AND ")
+		textSubjectClause(builder, index, tableAlias, textSubject)
+		// depth+1 because depth 0 is handled outside of this function
+		args = append(args, textSubject, depth+1)
+	}
+
+	return args
+}
+
+func actionDepthQuery(builder *strings.Builder, index *int, lastSubject eventstore.Subject) {
+	builder.WriteString("e.action_depth")
+	switch lastSubject {
+	case eventstore.MultiToken:
+		builder.WriteString(" >= $")
+	default:
+		builder.WriteString(" = $")
+	}
+	*index++
+	builder.WriteString(strconv.Itoa(*index))
+}
+
+func textSubjectClause(builder *strings.Builder, index *int, tableAlias string, subject eventstore.TextSubject) {
+	builder.WriteString(tableAlias)
+	builder.WriteString(".action = $")
+	*index++
+	builder.WriteString(strconv.Itoa(*index))
+	builder.WriteString(" AND ")
+	builder.WriteString(tableAlias)
+	builder.WriteString(".depth = $")
+	*index++
+	builder.WriteString(strconv.Itoa(*index))
 }

@@ -29,6 +29,23 @@ func (ts TextSubjects) Join(sep string) string {
 	return join(ts, sep)
 }
 
+func (ts TextSubjects) Compare(comp ...Subject) bool {
+	for i, s := range ts {
+		switch c := comp[i].(type) {
+		case TextSubject:
+			if s == c {
+				continue
+			}
+			return false
+		case singleToken:
+			continue
+		case multiToken:
+			return true
+		}
+	}
+	return true
+}
+
 type text interface{ ~string }
 
 // join is a copy of [strings.Join] which allows type constraints

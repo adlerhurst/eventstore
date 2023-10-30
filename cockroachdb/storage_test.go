@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/adlerhurst/eventstore/v0"
 	"github.com/cockroachdb/cockroach-go/v2/testserver"
@@ -25,7 +26,7 @@ func (*testStorage) After(ctx context.Context, t testing.TB) error {
 
 // Before implements eventstore.TestEventstore
 func (s *testStorage) Before(ctx context.Context, t testing.TB) (err error) {
-	_, err = s.client.Exec(ctx, "TRUNCATE eventstore.events")
+	_, err = s.client.Exec(ctx, "TRUNCATE eventstore.events CASCADE")
 	return err
 }
 
@@ -44,7 +45,7 @@ func startCRDB() *testStorage {
 	// 	t.Fatal(err)
 	// }
 	// dbpool, err := pgxpool.New(context.Background(), ts.PGURL().String())
-	config, err := pgxpool.ParseConfig("postgresql://root@localhost:26257/weekend?sslmode=disable&application_name=bench4")
+	config, err := pgxpool.ParseConfig("postgresql://root@localhost:26257/eventstore?sslmode=disable&application_name=bench4")
 	if err != nil {
 		log.Fatalf("unable to parse conn string: %v", err)
 	}
@@ -54,13 +55,55 @@ func startCRDB() *testStorage {
 		log.Fatalf("unable to create database pool: %v", err)
 	}
 
-	crdb := New(&Config{
+	store := New(&Config{
 		Pool: dbpool,
 	})
 
-	if err := crdb.Setup(context.Background()); err != nil {
+	if err := store.Setup(context.Background()); err != nil {
 		log.Fatalf("unable to setup cockroach: %v", err)
 	}
 
-	return &testStorage{CockroachDB: crdb}
+	return &testStorage{CockroachDB: store}
+}
+
+var _ eventstore.Action = (*testAction)(nil)
+
+type testAction struct {
+	action   eventstore.TextSubjects
+	revision uint16
+}
+
+// Action implements eventstore.Action.
+func (a *testAction) Action() eventstore.TextSubjects {
+	return a.action
+}
+
+// Revision implements eventstore.Action.
+func (a *testAction) Revision() uint16 {
+	return a.revision
+}
+
+var _ eventstore.Command = (*testCommand)(nil)
+
+type testCommand struct {
+	*testAction
+	payload any
+
+	createdAt time.Time
+	sequence  uint32
+}
+
+// Payload implements eventstore.Command.
+func (c *testCommand) Payload() any {
+	return c.payload
+}
+
+// SetCreationDate implements eventstore.Command.
+func (c *testCommand) SetCreationDate(creationDate time.Time) {
+	c.createdAt = creationDate
+}
+
+// SetSequence implements eventstore.Command.
+func (c *testCommand) SetSequence(sequence uint32) {
+	c.sequence = sequence
 }

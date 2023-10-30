@@ -44,7 +44,7 @@ func startCRDB() *testStorage {
 	// 	t.Fatal(err)
 	// }
 	// dbpool, err := pgxpool.New(context.Background(), ts.PGURL().String())
-	config, err := pgxpool.ParseConfig("postgresql://root@localhost:26257/weekend?sslmode=disable&application_name=bench4")
+	config, err := pgxpool.ParseConfig("postgresql://root@localhost:26257/eventstore?sslmode=disable&application_name=bench4")
 	if err != nil {
 		log.Fatalf("unable to parse conn string: %v", err)
 	}

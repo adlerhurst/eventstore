@@ -130,7 +130,7 @@ func push(ctx context.Context, tx pgx.Tx, indexes *aggregateIndexes, commands []
 	}
 
 	if rows.Err() != nil {
-		logger.ErrorContext(ctx, "push failed", "cause", err)
+		logger.ErrorContext(ctx, "push failed", "cause", rows.Err())
 		return rows.Err()
 	}
 

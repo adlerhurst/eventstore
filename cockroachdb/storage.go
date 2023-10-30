@@ -67,6 +67,7 @@ var setupStmt string
 
 func (store *CockroachDB) Setup(ctx context.Context) error {
 	_, err := store.client.Exec(ctx, setupStmt)
+	logger.ErrorContext(ctx, "setup failed", "cause", err)
 	return err
 }
 

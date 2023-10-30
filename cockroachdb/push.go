@@ -32,6 +32,7 @@ func (store *CockroachDB) Push(ctx context.Context, aggregates ...eventstore.Agg
 
 	conn, err := store.client.Acquire(ctx)
 	if err != nil {
+		logger.ErrorContext(ctx, "acquire connection failed", "cause", err)
 		return err
 	}
 	defer conn.Release()
@@ -40,6 +41,7 @@ func (store *CockroachDB) Push(ctx context.Context, aggregates ...eventstore.Agg
 	// filter queries are not relevant for the [filterIgnoreOpenPush] clause
 	_, err = conn.Exec(ctx, "SET application_name = $1", store.pushAppName)
 	if err != nil {
+		logger.ErrorContext(ctx, "set application name failed", "cause", err)
 		return err
 	}
 
@@ -65,6 +67,7 @@ func currentSequences(ctx context.Context, tx pgx.Tx, indexes *aggregateIndexes)
 
 	rows, err := tx.Query(ctx, builder.String(), indexes.toAggregateArgs()...)
 	if err != nil {
+		logger.ErrorContext(ctx, "query current sequences failed", "cause", err)
 		return err
 	}
 	defer rows.Close()
@@ -76,6 +79,7 @@ func currentSequences(ctx context.Context, tx pgx.Tx, indexes *aggregateIndexes)
 		)
 
 		if err = rows.Scan(&sequence, &aggregate); err != nil {
+			logger.ErrorContext(ctx, "scan of sequences failed", "cause", err)
 			return err
 		}
 
@@ -86,6 +90,7 @@ func currentSequences(ctx context.Context, tx pgx.Tx, indexes *aggregateIndexes)
 	// check is not made during scan to verify that non existing aggregates are also checked
 	for _, aggregate := range indexes.aggregates {
 		if aggregate.shouldCheckSequence && aggregate.index != aggregate.expectedSequence {
+			logger.DebugContext(ctx, "unexpected sequence", "expected", aggregate.expectedSequence, "got", aggregate.index)
 			return eventstore.ErrSequenceNotMatched
 		}
 	}
@@ -108,6 +113,7 @@ func push(ctx context.Context, tx pgx.Tx, indexes *aggregateIndexes, commands []
 
 	rows, err := tx.Query(ctx, pushBuilder.String(), eventsArgs...)
 	if err != nil {
+		logger.ErrorContext(ctx, "store commands failed", "cause", err)
 		return err
 	}
 	defer rows.Close()
@@ -116,10 +122,16 @@ func push(ctx context.Context, tx pgx.Tx, indexes *aggregateIndexes, commands []
 		var creationDate time.Time
 
 		if err = rows.Scan(&commands[i].id, &creationDate); err != nil {
+			logger.ErrorContext(ctx, "scan of returned command metadata failed", "cause", err)
 			return fmt.Errorf("push failed: %w", err)
 		}
 		commands[i].SetCreationDate(creationDate)
 		commands[i].SetSequence(commands[i].sequence)
+	}
+
+	if rows.Err() != nil {
+		logger.ErrorContext(ctx, "push failed", "cause", err)
+		return rows.Err()
 	}
 
 	var actionBuilder strings.Builder
@@ -128,12 +140,10 @@ func push(ctx context.Context, tx pgx.Tx, indexes *aggregateIndexes, commands []
 
 	_, err = tx.Exec(ctx, actionBuilder.String(), actionsArgs...)
 	if err != nil {
+		logger.ErrorContext(ctx, "store actions failed", "cause", err)
 		return err
 	}
 
-	if rows.Err() != nil {
-		return rows.Err()
-	}
 	return nil
 }
 

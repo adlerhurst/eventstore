@@ -16,6 +16,7 @@ func (store *CockroachDB) Filter(ctx context.Context, filter *eventstore.Filter,
 
 	conn, err := store.client.Acquire(ctx)
 	if err != nil {
+		logger.ErrorContext(ctx, "acquire connection failed", "cause", err)
 		return err
 	}
 	defer conn.Release()
@@ -24,6 +25,7 @@ func (store *CockroachDB) Filter(ctx context.Context, filter *eventstore.Filter,
 	// filter queries are not relevant for the [filterIgnoreOpenPush] clause
 	_, err = conn.Exec(ctx, "SET application_name = $1", store.filterAppName)
 	if err != nil {
+		logger.ErrorContext(ctx, "set application name failed", "cause", err)
 		return err
 	}
 
@@ -32,6 +34,7 @@ func (store *CockroachDB) Filter(ctx context.Context, filter *eventstore.Filter,
 		AccessMode: pgx.ReadOnly,
 	})
 	if err != nil {
+		logger.ErrorContext(ctx, "create transaction failed", "cause", err)
 		return err
 	}
 	defer func() {
@@ -45,6 +48,7 @@ func (store *CockroachDB) Filter(ctx context.Context, filter *eventstore.Filter,
 
 	rows, err := tx.Query(ctx, builder.String(), args...)
 	if err != nil {
+		logger.ErrorContext(ctx, "filter events failed", "cause", err)
 		return err
 	}
 	defer rows.Close()
@@ -60,12 +64,14 @@ func (store *CockroachDB) Filter(ctx context.Context, filter *eventstore.Filter,
 			&event.action,
 		)
 		if err != nil {
+			logger.ErrorContext(ctx, "scan of events failed", "cause", err)
 			event.payload = nil
 			eventPool.Put(event)
 			return err
 		}
 
 		if err = reducer.Reduce(event); err != nil {
+			logger.DebugContext(ctx, "reduce failed", "cause", err)
 			event.payload = nil
 			eventPool.Put(event)
 			return err

@@ -9,13 +9,19 @@ import (
 	"strings"
 	"time"
 
+	crdb "github.com/cockroachdb/cockroach-go/v2/crdb/crdbpgxv5"
 	"github.com/jackc/pgx/v5"
 
 	"github.com/adlerhurst/eventstore/v0"
 )
 
+var pushTxOptions = pgx.TxOptions{
+	IsoLevel:   pgx.Serializable,
+	AccessMode: pgx.ReadWrite,
+}
+
 // Push implements [eventstore.Eventstore]
-func (crdb *CockroachDB) Push(ctx context.Context, aggregates ...eventstore.Aggregate) (err error) {
+func (store *CockroachDB) Push(ctx context.Context, aggregates ...eventstore.Aggregate) (err error) {
 	indexes := prepareIndexes(aggregates)
 
 	commands, close, err := commandsFromAggregates(ctx, aggregates)
@@ -24,29 +30,26 @@ func (crdb *CockroachDB) Push(ctx context.Context, aggregates ...eventstore.Aggr
 	}
 	defer close()
 
-	conn, err := crdb.client.Acquire(ctx)
+	conn, err := store.client.Acquire(ctx)
 	if err != nil {
 		return err
 	}
 	defer conn.Release()
 
-	tx, err := conn.Begin(ctx)
+	// The application_name is required to differentiate between filter and push queries
+	// filter queries are not relevant for the [filterIgnoreOpenPush] clause
+	_, err = conn.Exec(ctx, "SET application_name = $1", store.pushAppName)
 	if err != nil {
 		return err
 	}
-	defer func() {
-		if err != nil {
-			_ = tx.Rollback(ctx)
-			return
+
+	return crdb.ExecuteTx(ctx, conn, pushTxOptions, func(tx pgx.Tx) error {
+		if err = currentSequences(ctx, tx, indexes); err != nil {
+			return err
 		}
-		err = tx.Commit(ctx)
-	}()
 
-	if err = currentSequences(ctx, tx, indexes); err != nil {
-		return err
-	}
-
-	return push(ctx, tx, indexes, commands)
+		return push(ctx, tx, indexes, commands)
+	})
 }
 
 var (

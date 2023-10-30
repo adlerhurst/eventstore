@@ -40,8 +40,8 @@ func (e *event) CreationDate() time.Time {
 }
 
 // Sequence implements [eventstore.Event]
-func (e *event) Sequence() uint64 {
-	return uint64(e.sequence)
+func (e *event) Sequence() uint32 {
+	return e.sequence
 }
 
 // UnmarshalPayload implements [eventstore.Event]

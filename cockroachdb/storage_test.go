@@ -55,15 +55,15 @@ func startCRDB() *testStorage {
 		log.Fatalf("unable to create database pool: %v", err)
 	}
 
-	crdb := New(&Config{
+	store := New(&Config{
 		Pool: dbpool,
 	})
 
-	if err := crdb.Setup(context.Background()); err != nil {
+	if err := store.Setup(context.Background()); err != nil {
 		log.Fatalf("unable to setup cockroach: %v", err)
 	}
 
-	return &testStorage{CockroachDB: crdb}
+	return &testStorage{CockroachDB: store}
 }
 
 var _ eventstore.Action = (*testAction)(nil)

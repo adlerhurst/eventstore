@@ -3,12 +3,42 @@ package eventstore
 import (
 	"context"
 	"errors"
+	"reflect"
 	"strconv"
 	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
 )
+
+var _ Reducer = (*testUserReducer)(nil)
+
+type testUserReducer struct {
+	id        string
+	sequence  uint32
+	FirstName string `json:"firstName"`
+	LastName  string `json:"lastName"`
+	Username  string `json:"username"`
+	isRemoved bool
+}
+
+// Reduce implements Reducer.
+func (r *testUserReducer) Reduce(events ...Event) error {
+	for _, event := range events {
+		r.sequence = event.Sequence()
+
+		if event.Action().Compare(TextSubject("user"), TextSubject(r.id), TextSubject("removed")) {
+			r.isRemoved = true
+			continue
+		}
+
+		err := event.UnmarshalPayload(r)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
 
 var _ Aggregate = (*testUser)(nil)
 
@@ -486,207 +516,293 @@ func pushDefaultCommands(ctx context.Context, t testing.TB, store TestEventstore
 	}
 }
 
-// func FilterComplianceTests(ctx context.Context, t *testing.T, store TestEventstore) {
-// 	type args struct {
-// 		filter *Filter
-// 	}
-// 	tests := []struct {
-// 		name    string
-// 		args    args
-// 		want    []*testUser
-// 		wantErr bool
-// 	}{
-// 		{
-// 			name: "multi token",
-// 			args: args{
-// 				filter: &Filter{
-// 					Action: []Subject{TextSubject("user"), TextSubject("id"), MultiToken},
-// 				},
-// 			},
-// 			want: []*testUser{
-// 				newTestUser("id",
-// 					withAdded("first name", "last name", "username"),
-// 					withRemoved(),
-// 				),
-// 			},
-// 			wantErr: false,
-// 		},
-// 		{
-// 			name: "multiple single tokens",
-// 			args: args{
-// 				filter: &Filter{
-// 					Action: []Subject{TextSubject("user"), SingleToken, SingleToken},
-// 				},
-// 			},
-// 			want: []*testUser{
-// 				newTestUser("id",
-// 					withAdded("first name", "last name", "username"),
-// 					withRemoved(),
-// 				),
-// 			},
-// 			wantErr: false,
-// 		},
-// 		{
-// 			name: "all",
-// 			args: args{
-// 				filter: &Filter{
-// 					Action: []Subject{
-// 						TextSubject("user"),
-// 						TextSubject("id"),
-// 						TextSubject("added"),
-// 					},
-// 				},
-// 			},
-// 			want: []*testUser{
-// 				newTestUser("id",
-// 					withAdded("first name", "last name", "username"),
-// 				),
-// 			},
-// 			wantErr: false,
-// 		},
-// 		{
-// 			name: "crdb",
-// 			args: args{
-// 				filter: &Filter{
-// 					Action: []Subject{MultiToken},
-// 				},
-// 			},
-// 			want: []*testUser{
-// 				newTestUser("id",
-// 					withAdded("first name", "last name", "username"),
-// 					withRemoved(),
-// 				),
-// 			},
-// 			wantErr: false,
-// 		},
-// 	}
-// 	if err := store.Before(ctx, t); err != nil {
-// 		t.Error("unable to execute store.Before: ", err)
-// 	}
-// 	_, err := store.Push(ctx,
-// 		newTestUser("id",
-// 			withAdded("first name", "last name", "username"),
-// 			withRemoved(),
-// 		),
-// 	)
-// 	if err != nil {
-// 		t.Fatalf("unable to push events: %v", err)
-// 	}
-// 	for _, tt := range tests {
-// 		t.Run(tt.name, func(t *testing.T) {
-// 			got, err := store.Filter(ctx, tt.args.filter)
-// 			if (err != nil) != tt.wantErr {
-// 				t.Errorf("Filter() error = %v, wantErr %v", err, tt.wantErr)
-// 				return
-// 			}
-// 			assertEvents(t, tt.want, got)
-// 		})
-// 	}
-// 	if err := store.After(ctx, t); err != nil {
-// 		t.Error("unable to execute store.After: ", err)
-// 	}
-// }
+func FilterComplianceTests(ctx context.Context, t *testing.T, store TestEventstore) {
+	type args struct {
+		filter *Filter
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    testUserReducer
+		wantErr bool
+	}{
+		{
+			name: "multi token",
+			args: args{
+				filter: &Filter{
+					Queries: []*FilterQuery{
+						{
+							Subjects: []Subject{TextSubject("user"), TextSubject("id"), MultiToken},
+						},
+					},
+				},
+			},
+			want: testUserReducer{
+				id:        "id",
+				sequence:  2,
+				isRemoved: true,
+				FirstName: "first name",
+				LastName:  "last name",
+				Username:  "username",
+			},
+			wantErr: false,
+		},
+		{
+			name: "multiple single tokens",
+			args: args{
+				filter: &Filter{
+					Queries: []*FilterQuery{
+						{
+							Subjects: []Subject{TextSubject("user"), SingleToken, SingleToken},
+						},
+					},
+				},
+			},
+			want: testUserReducer{
+				id:        "id",
+				sequence:  2,
+				isRemoved: true,
+				FirstName: "first name",
+				LastName:  "last name",
+				Username:  "username",
+			},
+			wantErr: false,
+		},
+		{
+			name: "all",
+			args: args{
+				filter: &Filter{
+					Queries: []*FilterQuery{
+						{
+							Subjects: []Subject{
+								TextSubject("user"),
+								TextSubject("id"),
+								TextSubject("added"),
+							},
+						},
+					},
+				},
+			},
+			want: testUserReducer{
+				id:        "id",
+				sequence:  1,
+				isRemoved: false,
+				FirstName: "first name",
+				LastName:  "last name",
+				Username:  "username",
+			},
+			wantErr: false,
+		},
+		{
+			name: "crdb",
+			args: args{
+				filter: &Filter{
+					Queries: []*FilterQuery{
+						{
+							Subjects: []Subject{MultiToken},
+						},
+					},
+				},
+			},
+			want: testUserReducer{
+				id:        "id",
+				sequence:  2,
+				isRemoved: true,
+				FirstName: "first name",
+				LastName:  "last name",
+				Username:  "username",
+			},
+			wantErr: false,
+		},
+	}
+	if err := store.Before(ctx, t); err != nil {
+		t.Error("unable to execute store.Before: ", err)
+	}
+	err := store.Push(ctx,
+		newTestUser("id",
+			withAdded("first name", "last name", "username"),
+			withRemoved(),
+		),
+	)
+	if err != nil {
+		t.Fatalf("unable to push events: %v", err)
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := testUserReducer{id: tt.want.id}
+			err := store.Filter(ctx, tt.args.filter, &got)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Filter() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("wrong reduce want\n%#v\ngot:\n%#v", tt.want, got)
+			}
+		})
+	}
+	if err := store.After(ctx, t); err != nil {
+		t.Error("unable to execute store.After: ", err)
+	}
+}
 
-// func FilterBenchTests(ctx context.Context, b *testing.B, store TestEventstore) {
-// 	type args struct {
-// 		filter *Filter
-// 	}
-// 	tests := []struct {
-// 		name    string
-// 		args    args
-// 		want    int
-// 		wantErr bool
-// 	}{
-// 		{
-// 			name: "multi token",
-// 			args: args{
-// 				filter: &Filter{
-// 					Action: []Subject{TextSubject("user"), TextSubject("5555"), MultiToken},
-// 				},
-// 			},
-// 			want:    2,
-// 			wantErr: false,
-// 		},
-// 		{
-// 			name: "multiple single tokens",
-// 			args: args{
-// 				filter: &Filter{
-// 					Action: []Subject{TextSubject("user"), SingleToken, SingleToken},
-// 				},
-// 			},
-// 			want:    20_000,
-// 			wantErr: false,
-// 		},
-// 		{
-// 			name: "all",
-// 			args: args{
-// 				filter: &Filter{
-// 					Action: []Subject{
-// 						TextSubject("user"),
-// 						TextSubject("5555"),
-// 						TextSubject("added"),
-// 					},
-// 				},
-// 			},
-// 			want:    1,
-// 			wantErr: false,
-// 		},
-// 		{
-// 			name: "multi token at beginning",
-// 			args: args{
-// 				filter: &Filter{
-// 					Action: []Subject{MultiToken},
-// 				},
-// 			},
-// 			want:    20_000,
-// 			wantErr: false,
-// 		},
-// 		{
-// 			name: "all added",
-// 			args: args{
-// 				filter: &Filter{
-// 					Action: []Subject{TextSubject("user"), SingleToken, TextSubject("added")},
-// 				},
-// 			},
-// 			want:    10_000,
-// 			wantErr: false,
-// 		},
-// 	}
-// 	if err := store.Before(ctx, b); err != nil {
-// 		b.Error("unable to execute store.Before: ", err)
-// 	}
-// 	for i := 0; i < 10_000; i++ {
-// 		err := store.Push(ctx,
-// 			newTestUser(strconv.Itoa(i),
-// 				withAdded("first name", "last name", "username"),
-// 				withRemoved(),
-// 			),
-// 		)
-// 		if err != nil {
-// 			b.Fatalf("unable to push events: %v", err)
-// 		}
-// 	}
-// 	b.ResetTimer()
-// 	for _, tt := range tests {
-// 		b.Run(tt.name, func(b *testing.B) {
-// 			b.RunParallel(func(p *testing.PB) {
-// 				for n := 0; p.Next(); n++ {
-// 					got, err := store.Filter(ctx, tt.args.filter)
-// 					if (err != nil) != tt.wantErr {
-// 						b.Errorf("Filter() error = %v, wantErr %v", err, tt.wantErr)
-// 						return
-// 					}
-// 					if len(got) != tt.want {
-// 						b.Errorf("unexpected amount of events. want: %d, got %d", tt.want, len(got))
-// 					}
-// 				}
-// 			})
-// 		})
-// 	}
-// 	if err := store.After(ctx, b); err != nil {
-// 		b.Error("unable to execute store.After: ", err)
-// 	}
-// }
+func FilterBenchTests(ctx context.Context, b *testing.B, store TestEventstore) {
+	type args struct {
+		filter *Filter
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    testUserReducer
+		wantErr bool
+	}{
+		{
+			name: "multi token",
+			args: args{
+				filter: &Filter{
+					Queries: []*FilterQuery{
+						{
+							Subjects: []Subject{TextSubject("user"), TextSubject("5555"), MultiToken},
+						},
+					},
+				},
+			},
+			want: testUserReducer{
+				id:        "5555",
+				sequence:  2,
+				isRemoved: true,
+				FirstName: "first name",
+				LastName:  "last name",
+				Username:  "username",
+			},
+			wantErr: false,
+		},
+		// {
+		// 	name: "multiple single tokens",
+		// 	args: args{
+		// 		filter: &Filter{
+		// 			Queries: []*FilterQuery{
+		// 				{
+		// 					Subjects: []Subject{TextSubject("user"), SingleToken, SingleToken},
+		// 				},
+		// 			},
+		// 		},
+		// 	},
+		// 	want: testUserReducer{
+		// 		id:        "5555",
+		// 		sequence:  2,
+		// 		isRemoved: true,
+		// 		FirstName: "first name",
+		// 		LastName:  "last name",
+		// 		Username:  "username",
+		// 	},
+		// 	wantErr: false,
+		// },
+		{
+			name: "all",
+			args: args{
+				filter: &Filter{
+					Queries: []*FilterQuery{
+						{
+							Subjects: []Subject{
+								TextSubject("user"),
+								TextSubject("5555"),
+								TextSubject("added"),
+							},
+						},
+					},
+				},
+			},
+			want: testUserReducer{
+				id:        "5555",
+				sequence:  1,
+				isRemoved: false,
+				FirstName: "first name",
+				LastName:  "last name",
+				Username:  "username",
+			},
+			wantErr: false,
+		},
+		// {
+		// 	name: "multi token at beginning",
+		// 	args: args{
+		// 		filter: &Filter{
+		// 			Queries: []*FilterQuery{
+		// 				{
+		// 					Subjects: []Subject{MultiToken},
+		// 				},
+		// 			},
+		// 		},
+		// 	},
+		// 	want: testUserReducer{
+		// 		id:        "5555",
+		// 		sequence:  2,
+		// 		isRemoved: true,
+		// 		FirstName: "first name",
+		// 		LastName:  "last name",
+		// 		Username:  "username",
+		// 	},
+		// 	wantErr: false,
+		// },
+		// {
+		// 	name: "all added",
+		// 	args: args{
+		// 		filter: &Filter{
+		// 			Queries: []*FilterQuery{
+		// 				{
+		// 					Subjects: []Subject{TextSubject("user"), SingleToken, TextSubject("added")},
+		// 				},
+		// 			},
+		// 		},
+		// 	},
+		// 	want: testUserReducer{
+		// 		id:        "5555",
+		// 		sequence:  2,
+		// 		isRemoved: true,
+		// 		FirstName: "first name",
+		// 		LastName:  "last name",
+		// 		Username:  "username",
+		// 	},
+		// 	wantErr: false,
+		// },
+	}
+	b.StopTimer()
+	if err := store.Before(ctx, b); err != nil {
+		b.Error("unable to execute store.Before: ", err)
+	}
+	for i := 0; i < 10_000; i++ {
+		err := store.Push(ctx,
+			newTestUser(strconv.Itoa(i),
+				withAdded("first name", "last name", "username"),
+				withRemoved(),
+			),
+		)
+		if err != nil {
+			b.Fatalf("unable to push events: %v", err)
+		}
+	}
+	b.ResetTimer()
+	b.StartTimer()
+	for _, tt := range tests {
+		b.Run(tt.name, func(b *testing.B) {
+			b.RunParallel(func(p *testing.PB) {
+				for n := 0; p.Next(); n++ {
+					got := testUserReducer{id: tt.want.id}
+					err := store.Filter(ctx, tt.args.filter, &got)
+					if (err != nil) != tt.wantErr {
+						b.Errorf("Filter() error = %v, wantErr %v", err, tt.wantErr)
+						return
+					}
+					if !reflect.DeepEqual(got, tt.want) {
+						b.Errorf("wrong reduce want\n%#v\ngot:\n%#v", tt.want, got)
+					}
+				}
+			})
+		})
+	}
+	if err := store.After(ctx, b); err != nil {
+		b.Error("unable to execute store.After: ", err)
+	}
+}
 
 type commandAsserter interface {
 	assert(t *testing.T) bool
@@ -709,30 +825,3 @@ func assertAggregates(t *testing.T, aggregates []Aggregate) (failed bool) {
 
 	return failed
 }
-
-// func assertPayload(t *testing.T, want Command, got func(object any) error) (failed bool) {
-// 	unmarshalWant := func(object any) error {
-// 		data, err := json.Marshal(want.Payload())
-// 		if err != nil {
-// 			return err
-// 		}
-// 		return json.Unmarshal(data, object)
-// 	}
-// 	var (
-// 		gotPayload, wantPayload interface{}
-// 	)
-// 	if err := unmarshalWant(&wantPayload); err != nil {
-// 		t.Errorf("unable to unmarshal want payload: %v", err)
-// 		failed = true
-// 	}
-// 	if err := got(&gotPayload); err != nil {
-// 		t.Errorf("unable to unmarshal gotten payload: %v", err)
-// 		failed = true
-// 	}
-// 	if !reflect.DeepEqual(gotPayload, wantPayload) {
-// 		t.Errorf("payload not equal want: %#v got: %#v", wantPayload, gotPayload)
-// 		failed = true
-// 	}
-
-// 	return failed
-// }

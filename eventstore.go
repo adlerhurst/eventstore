@@ -75,7 +75,7 @@ type Event interface {
 	// e.g. user A: {"users", "A"}
 	Aggregate() TextSubjects
 	// Sequence represents the position of the event inside a specific subject
-	Sequence() uint64
+	Sequence() uint32
 	// CreationDate is the timestamp the event was stored to the eventstore
 	CreationDate() time.Time
 	// UnmarshalPayload maps the stored payload into the given object
@@ -85,19 +85,24 @@ type Event interface {
 
 // Filter represents a query
 type Filter struct {
-	// Sequence filters the sequences of all the actions
+	// Queries are queries on subjects
+	Queries []*FilterQuery
+	// Limit represents the maximum events returned
+	Limit uint64
+}
+
+type FilterQuery struct {
+	// Sequence limits the sequences for this query
 	Sequence SequenceFilter
 	// CreatedAt filters the time and event was created
 	CreatedAt CreatedAtFilter
-	// Limit represents the maximum events returned
-	Limit uint64
 	// Action represents the event type
-	Action []Subject
+	Subjects []Subject
 }
 
 type SequenceFilter struct {
-	From uint64
-	To   uint64
+	From uint32
+	To   uint32
 }
 
 type CreatedAtFilter struct {

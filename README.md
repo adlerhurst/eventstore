@@ -19,8 +19,8 @@ It makes development hard because you have to think of what you do before you st
 Some ideas which probably will be implemented. The list is unordered and some points might never be implemented.
 
 - [x] allow multiple filters in eventstore.Filter
-  ~~- [ ] storage: provide an Optimize method to simpify queries~~
-  ~~- [ ] maybe two layers of optimizations would be more useful. First in eventstore to collect filters and one in storage optimized on it's internal data structures.~~
+  - [ ] ~~storage: provide an Optimize method to simpify queries~~
+  - [ ] ~~maybe two layers of optimizations would be more useful. First in eventstore to collect filters and one in storage optimized on it's internal data structures.~~
 - [ ] additional storage types
   - [ ] sql (crdb) storage
   - [ ] file storage

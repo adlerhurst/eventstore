@@ -18,16 +18,16 @@ It makes development hard because you have to think of what you do before you st
 
 Some ideas which probably will be implemented. The list is unordered and some points might never be implemented.
 
-- [ ] allow multiple filters in eventstore.Filter
-  - [ ] storage: provide an Optimize method to simpify queries
-  - [ ] maybe two layers of optimizations would be more useful. First in eventstore to collect filters and one in storage optimized on it's internal data structures.
+- [x] allow multiple filters in eventstore.Filter
+  ~~- [ ] storage: provide an Optimize method to simpify queries~~
+  ~~- [ ] maybe two layers of optimizations would be more useful. First in eventstore to collect filters and one in storage optimized on it's internal data structures.~~
 - [ ] additional storage types
   - [ ] sql (crdb) storage
   - [ ] file storage
 - [ ] memory: optimize tree
   - [ ] self balanced
   - [ ] check out different tree styles
-- [ ] testing suite
+- [x] testing suite
 - [ ] fuzzy testing with go1.18
 - [x] Think of an option to register event types to return the concrete type instead of the `Event`-struct (Event would change to interface)
 - [ ] Subscriber: add the possibility to listen to message queues

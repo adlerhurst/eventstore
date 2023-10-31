@@ -40,6 +40,6 @@ jobs:
         CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
       with:
         fail_ci_if_error: false
-        file: profile.out
+        file: profile.cov
         name: unit-tests
         flags: unit-tests

@@ -26,7 +26,7 @@ jobs:
         check-latest: true
     
     - name: Install dependencies
-      run: go mod install
+      run: go mod download
 
     - name: Build
       run: go build -v ./...

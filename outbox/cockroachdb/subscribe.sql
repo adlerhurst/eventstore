@@ -1,1 +1,0 @@
-INSERT INTO outbox2.subscriptions (pattern) VALUES $1 RETURNING id;

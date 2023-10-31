@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/adlerhurst/eventstore/v0"
+	"github.com/adlerhurst/eventstore/v1"
 )
 
 func Benchmark_Push_ParallelSameAggregate(b *testing.B) {

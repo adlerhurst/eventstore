@@ -7,7 +7,7 @@ package fs
 // 	"os"
 // 	"testing"
 
-// 	"github.com/adlerhurst/eventstore/v0"
+// 	"github.com/adlerhurst/eventstore/v1"
 // )
 
 // var (

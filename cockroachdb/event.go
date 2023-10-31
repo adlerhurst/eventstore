@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/adlerhurst/eventstore/v0"
+	"github.com/adlerhurst/eventstore/v1"
 )
 
 var _ eventstore.Event = (*event)(nil)

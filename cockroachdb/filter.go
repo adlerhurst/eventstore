@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/adlerhurst/eventstore/v0"
+	"github.com/adlerhurst/eventstore/v1"
 	"github.com/jackc/pgx/v5"
 )
 

@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/adlerhurst/eventstore/v0"
+	"github.com/adlerhurst/eventstore/v1"
 	"github.com/cockroachdb/cockroach-go/v2/testserver"
 	"github.com/jackc/pgx/v5/pgxpool"
 )

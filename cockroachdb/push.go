@@ -12,7 +12,7 @@ import (
 	crdb "github.com/cockroachdb/cockroach-go/v2/crdb/crdbpgxv5"
 	"github.com/jackc/pgx/v5"
 
-	"github.com/adlerhurst/eventstore/v0"
+	"github.com/adlerhurst/eventstore/v1"
 )
 
 var pushTxOptions = pgx.TxOptions{

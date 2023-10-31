@@ -32,7 +32,7 @@ jobs:
       run: go build -v ./...
 
     - name: Test
-      run: go test -race ./...
+      run: go test -race -coverprofile=profile.cov ./...
 
     - name: Upload coverage reports to Codecov
       uses: codecov/codecov-action@v3
@@ -40,5 +40,6 @@ jobs:
         CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
       with:
         fail_ci_if_error: false
+        file: profile.out
         name: unit-tests
         flags: unit-tests

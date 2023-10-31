@@ -38,23 +38,8 @@ func TestMain(m *testing.M) {
 }
 
 func startCRDB() *testStorage {
-	ts, err := testserver.NewTestServer()
-	if err != nil {
-		log.Fatal(err)
-	}
-	dbpool, err := pgxpool.New(context.Background(), ts.PGURL().String())
-	// config, err := pgxpool.ParseConfig("postgresql://root@localhost:26257/eventstore?sslmode=disable&application_name=bench4")
-	if err != nil {
-		log.Fatalf("unable to parse conn string: %v", err)
-	}
-
-	// dbpool, err := pgxpool.NewWithConfig(context.Background(), config)
-	// if err != nil {
-	// 	log.Fatalf("unable to create database pool: %v", err)
-	// }
-
 	store := New(&Config{
-		Pool: dbpool,
+		Pool: connectToDB(),
 	})
 
 	if err := store.Setup(context.Background()); err != nil {
@@ -104,4 +89,38 @@ func (c *testCommand) SetCreationDate(creationDate time.Time) {
 // SetSequence implements eventstore.Command.
 func (c *testCommand) SetSequence(sequence uint32) {
 	c.sequence = sequence
+}
+
+func connectToDB() *pgxpool.Pool {
+	if isCI := os.Getenv("CI"); isCI == "true" {
+		return connectToTestServer()
+	}
+
+	return connectToLocalhost()
+}
+
+func connectToTestServer() *pgxpool.Pool {
+	ts, err := testserver.NewTestServer()
+	if err != nil {
+		log.Fatal(err)
+	}
+	pool, err := pgxpool.New(context.Background(), ts.PGURL().String())
+	if err != nil {
+		log.Fatalf("unable to create database pool: %v", err)
+	}
+	return pool
+}
+
+func connectToLocalhost() *pgxpool.Pool {
+	config, err := pgxpool.ParseConfig("postgresql://root@localhost:26257/eventstore?sslmode=disable")
+	if err != nil {
+		log.Fatalf("unable to parse conn string: %v", err)
+	}
+
+	pool, err := pgxpool.NewWithConfig(context.Background(), config)
+	if err != nil {
+		log.Fatalf("unable to create database pool: %v", err)
+	}
+
+	return pool
 }

@@ -38,22 +38,20 @@ func TestMain(m *testing.M) {
 }
 
 func startCRDB() *testStorage {
-	var ts *testserver.TestServer
-	_ = ts
-	// ts, err := testserver.NewTestServer()
-	// if err != nil {
-	// 	t.Fatal(err)
-	// }
-	// dbpool, err := pgxpool.New(context.Background(), ts.PGURL().String())
-	config, err := pgxpool.ParseConfig("postgresql://root@localhost:26257/eventstore?sslmode=disable&application_name=bench4")
+	ts, err := testserver.NewTestServer()
+	if err != nil {
+		log.Fatal(err)
+	}
+	dbpool, err := pgxpool.New(context.Background(), ts.PGURL().String())
+	// config, err := pgxpool.ParseConfig("postgresql://root@localhost:26257/eventstore?sslmode=disable&application_name=bench4")
 	if err != nil {
 		log.Fatalf("unable to parse conn string: %v", err)
 	}
 
-	dbpool, err := pgxpool.NewWithConfig(context.Background(), config)
-	if err != nil {
-		log.Fatalf("unable to create database pool: %v", err)
-	}
+	// dbpool, err := pgxpool.NewWithConfig(context.Background(), config)
+	// if err != nil {
+	// 	log.Fatalf("unable to create database pool: %v", err)
+	// }
 
 	store := New(&Config{
 		Pool: dbpool,

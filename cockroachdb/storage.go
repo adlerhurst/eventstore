@@ -7,8 +7,8 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/adlerhurst/eventstore/v0"
-	"github.com/adlerhurst/eventstore/v0/x"
+	"github.com/adlerhurst/eventstore/v1"
+	"github.com/adlerhurst/eventstore/x"
 )
 
 type Config struct {

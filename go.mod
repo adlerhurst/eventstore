@@ -1,4 +1,4 @@
-module github.com/adlerhurst/eventstore/v0
+module github.com/adlerhurst/eventstore/v1
 
 go 1.21
 

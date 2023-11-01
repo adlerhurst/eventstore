@@ -28,16 +28,11 @@ type Aggregate interface {
 	ID() TextSubjects
 	// Commands is the list of write intents
 	Commands() []Command
-}
-
-// AggregatePredefinedSequence is used in storage to determine if the command requires a specific sequence
-// If the order doesn't matter the command must not implement this interface
-type AggregatePredefinedSequence interface {
-	Aggregate
 	// CurrentSequence returns the current sequence of the aggregate
+	// If the aggregate doesn't care about the current sequence it returns nil
 	// If it's the first command return 0
 	// If it's the nth command return the specific sequence
-	CurrentSequence() uint32
+	CurrentSequence() *uint32
 }
 
 // Action describes the base data of [Command]'s and [Event]'s

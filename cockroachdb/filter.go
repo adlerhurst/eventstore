@@ -80,7 +80,7 @@ func (store *CockroachDB) Filter(ctx context.Context, filter *eventstore.Filter,
 		eventPool.Put(event)
 	}
 
-	return nil
+	return rows.Err()
 }
 
 var (

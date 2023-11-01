@@ -44,9 +44,9 @@ func commandsFromAggregate(ctx context.Context, aggregate eventstore.Aggregate) 
 		commands[i].Command = command
 		commands[i].aggregate = aggregate.ID()
 
-		if command.Payload() != nil {
+		if payload := command.Payload(); payload != nil {
 			var err error
-			commands[i].payload, err = json.Marshal(command.Payload())
+			commands[i].payload, err = json.Marshal(payload)
 			if err != nil {
 				logger.ErrorContext(ctx, "marshal payload failed", "cause", err, "action", commands[i].Action().Join("."))
 				return nil, err

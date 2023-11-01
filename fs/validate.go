@@ -6,7 +6,7 @@ package fs
 // 	"os"
 // 	"strings"
 
-// 	"github.com/adlerhurst/eventstore/v1"
+// 	"github.com/adlerhurst/eventstore"
 // )
 
 // var _ eventstore.Eventstore = (*Validator)(nil)

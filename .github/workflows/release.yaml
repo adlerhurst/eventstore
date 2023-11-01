@@ -18,4 +18,4 @@ jobs:
         with:
           release-type: go
           package-name: adlerhurst/eventstore
-          versioning-strategy: always-bunmp-patch
+          versioning-strategy: always-bump-patch

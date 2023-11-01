@@ -1,0 +1,41 @@
+syntax = "proto3";
+
+package eventstore.v1alpha;
+
+import "google/protobuf/timestamp.proto";
+import "eventstore/v1alpha/event.proto";
+
+service EventStoreService {
+  rpc Push(PushRequest) returns (PushResponse);
+  rpc Filter(FilterRequest) returns (stream FilterResponse);
+}
+
+message PushRequest {
+  repeated eventstore.v1alpha.Aggregate aggregates = 1;
+}
+
+message PushResponse {}
+
+message FilterRequest {
+  repeated Query queries = 1;
+  uint64 limit = 2;
+}
+
+message Query {
+  message Sequence {
+    uint32 from = 1;
+    uint32 to = 2;
+  }
+  message CreatedAt {
+    google.protobuf.Timestamp from = 1;
+    google.protobuf.Timestamp to = 2;
+  }
+
+  repeated eventstore.v1alpha.Subject subjects = 1;
+  Sequence sequence = 2;
+  CreatedAt created_at = 3;
+}
+
+message FilterResponse {
+  repeated eventstore.v1alpha.Event events = 1;
+}

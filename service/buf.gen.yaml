@@ -1,0 +1,16 @@
+version: v1
+managed:
+  enabled: true
+  go_package_prefix:
+    default: github.com/adlerhurst/eventstore/service/internal/api
+plugins:
+  - plugin: go
+    out: internal/api
+    opt: paths=source_relative
+  - plugin: go-grpc
+    out: internal/api
+    opt: paths=source_relative
+  # - plugin: grpc-gateway
+  #   out: internal/api
+  # - plugin: openapiv2
+  #   out: internal/api

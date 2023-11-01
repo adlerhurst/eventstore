@@ -1,0 +1,41 @@
+syntax = "proto3";
+
+package eventstore.v1alpha;
+
+import "google/protobuf/struct.proto";
+import "google/protobuf/timestamp.proto";
+
+message Event {
+  string id = 1;
+  Action action = 2;
+  uint32 sequence = 3;
+  google.protobuf.Timestamp created_at = 4;
+}
+
+message Aggregate {
+  repeated string id = 1;
+  repeated Command commands = 2;
+  optional uint32 current_sequence = 3;
+}
+
+message Command {
+  Action action = 1;
+}
+
+message Action {
+  repeated string action = 1;
+  uint32 revision = 2;
+  optional google.protobuf.Struct payload = 3;
+}
+
+message Subject {
+  enum Wildcard {
+    WILDCARD_UNSPECIFIED = 0;
+    WILDCARD_SINGLE_TOKEN = 1;
+    WILDCARD_MULTI_TOKEN = 2;
+  }
+  oneof subject {
+    string text = 1;
+    Wildcard wildcard = 2;
+  }
+}

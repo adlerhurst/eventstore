@@ -42,7 +42,7 @@ type AggregatePredefinedSequence interface {
 
 // Action describes the base data of [Command]'s and [Event]'s
 type Action interface {
-	// Action represent the change of an object
+	// Action represent the change of an object.
 	//
 	// most likely the [Aggregate()] list will be the first elements of the
 	// [Action]

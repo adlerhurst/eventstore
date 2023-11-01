@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/adlerhurst/eventstore"
+	"github.com/adlerhurst/eventstore/v2"
 )
 
 type command struct {

@@ -10,7 +10,7 @@ package fs
 // 	"os"
 // 	"time"
 
-// 	"github.com/adlerhurst/eventstore/v1"
+// 	"github.com/adlerhurst/eventstore"
 // )
 
 // var _ eventstore.Eventstore = (*FS)(nil)

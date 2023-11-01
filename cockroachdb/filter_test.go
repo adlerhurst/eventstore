@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/adlerhurst/eventstore/v1"
+	"github.com/adlerhurst/eventstore"
 )
 
 func Benchmark_Filter(b *testing.B) {

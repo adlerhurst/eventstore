@@ -160,10 +160,9 @@ func prepareIndexes(aggregates []eventstore.Aggregate) *aggregateIndexes {
 		index = &aggregateIndex{
 			aggregate: aggregate.ID(),
 		}
-		sequenceChecker, ok := aggregate.(eventstore.AggregatePredefinedSequence)
-		if ok {
+		if sequence := aggregate.CurrentSequence(); sequence != nil {
 			index.shouldCheckSequence = true
-			index.expectedSequence = sequenceChecker.CurrentSequence()
+			index.expectedSequence = *sequence
 		}
 		indexes.aggregates = append(indexes.aggregates, index)
 	}

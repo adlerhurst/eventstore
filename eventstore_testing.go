@@ -45,19 +45,13 @@ var _ Aggregate = (*testUser)(nil)
 type testUser struct {
 	id                 string
 	currentSequence    uint32
-	predefinedSequence uint32
+	predefinedSequence *uint32
 	commands           []Command
 }
 
-var _ AggregatePredefinedSequence = (*testUserWithSequence)(nil)
-
-type testUserWithSequence struct {
-	*testUser
-}
-
-// CurrentSequence implements AggregatePredefinedSequence.
-func (a *testUserWithSequence) CurrentSequence() uint32 {
-	return a.testUser.predefinedSequence
+// CurrentSequence implements Aggregate.
+func (a *testUser) CurrentSequence() *uint32 {
+	return a.predefinedSequence
 }
 
 // Commands implements Aggregate.
@@ -78,15 +72,13 @@ func newTestUser(id string, opts ...testUserOpt) Aggregate {
 	for _, opt := range opts {
 		tu = opt(tu)
 	}
-	if tu.predefinedSequence > 0 {
-		return &testUserWithSequence{tu}
-	}
+
 	return tu
 }
 
 func withPredefinedSequence(sequence uint32) testUserOpt {
 	return func(tu *testUser) *testUser {
-		tu.predefinedSequence = sequence
+		tu.predefinedSequence = &sequence
 		return tu
 	}
 }

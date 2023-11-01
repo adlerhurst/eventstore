@@ -1,53 +1,38 @@
 package api
 
 import (
-	"github.com/adlerhurst/eventstore"
 	"github.com/adlerhurst/eventstore/service/internal/api/eventstore/v1alpha"
+	"github.com/adlerhurst/eventstore/v2"
 )
 
 var (
-	_ eventstore.Aggregate                   = (*AggregateWithoutSequence)(nil)
-	_ eventstore.AggregatePredefinedSequence = (*AggregateWithSequence)(nil)
+	_ eventstore.Aggregate = (*Aggregate)(nil)
 )
 
-// AggregateWithoutSequence implements eventstore.Aggregate
-type AggregateWithoutSequence struct {
+// Aggregate implements eventstore.Aggregate
+type Aggregate struct {
 	id       eventstore.TextSubjects
 	commands []eventstore.Command
+	sequence *uint32
 }
 
-// AggregateWithSequence implements eventstore.AggregatePredefinedSequence
-type AggregateWithSequence struct {
-	AggregateWithoutSequence
-	sequence uint32
-}
-
-// CurrentSequence implements eventstore.AggregatePredefinedSequence.
-func (a *AggregateWithSequence) CurrentSequence() uint32 {
+// CurrentSequence implements eventstore.Aggregate.
+func (a *Aggregate) CurrentSequence() *uint32 {
 	return a.sequence
 }
 
 // Commands implements eventstore.Aggregate.
-func (a *AggregateWithoutSequence) Commands() []eventstore.Command {
+func (a *Aggregate) Commands() []eventstore.Command {
 	return a.commands
 }
 
 // ID implements eventstore.Aggregate.
-func (a *AggregateWithoutSequence) ID() eventstore.TextSubjects {
+func (a *Aggregate) ID() eventstore.TextSubjects {
 	return a.id
 }
 
 func protoToAggregate(aggregate *eventstorev1alpha.Aggregate) eventstore.Aggregate {
-	if aggregate.CurrentSequence != nil {
-		return &AggregateWithSequence{
-			AggregateWithoutSequence: AggregateWithoutSequence{
-				id:       toTextSubjects(aggregate.Id),
-				commands: protoToCommands(aggregate.Commands),
-			},
-			sequence: *aggregate.CurrentSequence,
-		}
-	}
-	return &AggregateWithoutSequence{
+	return &Aggregate{
 		id:       toTextSubjects(aggregate.Id),
 		commands: protoToCommands(aggregate.Commands),
 	}

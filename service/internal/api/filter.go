@@ -3,8 +3,8 @@ package api
 import (
 	"time"
 
-	"github.com/adlerhurst/eventstore"
 	"github.com/adlerhurst/eventstore/service/internal/api/eventstore/v1alpha"
+	"github.com/adlerhurst/eventstore/v2"
 )
 
 func filterRequestToFilter(req *eventstorev1alpha.FilterRequest) *eventstore.Filter {

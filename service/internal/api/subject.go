@@ -1,8 +1,8 @@
 package api
 
 import (
-	"github.com/adlerhurst/eventstore"
 	eventstorev1alpha "github.com/adlerhurst/eventstore/service/internal/api/eventstore/v1alpha"
+	"github.com/adlerhurst/eventstore/v2"
 )
 
 func toTextSubjects(action []string) eventstore.TextSubjects {

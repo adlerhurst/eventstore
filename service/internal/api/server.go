@@ -5,8 +5,8 @@ import (
 	"log/slog"
 	"sync"
 
-	"github.com/adlerhurst/eventstore"
 	"github.com/adlerhurst/eventstore/service/internal/api/eventstore/v1alpha"
+	"github.com/adlerhurst/eventstore/v2"
 )
 
 var (

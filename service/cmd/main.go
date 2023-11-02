@@ -1,21 +1,14 @@
 package main
 
 import (
-	// "context"
-	// "log"
-	// "net"
-	"log"
+	"errors"
 	"log/slog"
 	"os"
 
-	// "github.com/adlerhurst/eventstore/cockroachdb"
-	// "github.com/adlerhurst/eventstore/service/internal/api"
-	// eventstorev1alpha "github.com/adlerhurst/eventstore/service/internal/api/eventstore/v1alpha"
-	// "github.com/jackc/pgx/v5/pgxpool"
+	"github.com/adlerhurst/eventstore/service/cmd/client"
 	"github.com/adlerhurst/eventstore/service/cmd/server"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	// "google.golang.org/grpc"
 )
 
 var (
@@ -32,16 +25,21 @@ var (
 )
 
 func init() {
+	logHandler := slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{AddSource: true, Level: slog.LevelDebug})
+	logger = slog.New(logHandler)
+	slog.SetDefault(logger)
+
 	cobra.OnInitialize(initConfig)
 
 	rootCmd.PersistentFlags().StringVar(&configPath, "config", "", "config file (default is $HOME/.eventstore/config.yaml)")
 	rootCmd.AddCommand(server.Command)
+	rootCmd.AddCommand(client.Command)
 	rootCmd.Version = version
 }
 
 func main() {
 	err := rootCmd.Execute()
-	log.Fatal("failed to execute command", err)
+	cobra.CheckErr(err)
 }
 
 func initConfig() {
@@ -50,11 +48,15 @@ func initConfig() {
 	setConfig()
 
 	viper.AutomaticEnv()
-
 	err := viper.ReadInConfig()
-	if err != nil {
+
+	var configNotFoundErr viper.ConfigFileNotFoundError
+	if errors.As(err, &configNotFoundErr) {
 		logger.Info("no config found fall back to default")
+		return
 	}
+	logger.Error("failed to read config", "cause", err)
+	os.Exit(1)
 }
 
 func setConfig() {

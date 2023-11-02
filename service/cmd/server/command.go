@@ -17,6 +17,13 @@ import (
 	"google.golang.org/grpc/reflection"
 )
 
+type Config struct {
+	Connection string
+	Logger     *slog.Logger
+	Host       string
+	Port       uint16
+}
+
 var (
 	config = Config{
 		Connection: "postgresql://root@localhost:26257/eventstore?sslmode=disable",
@@ -39,22 +46,21 @@ func init() {
 func run(cmd *cobra.Command, args []string) {
 	ctx, cancel := context.WithCancel(cmd.Context())
 	defer cancel()
+	config.Logger.DebugContext(cmd.Context(), "parse db connection")
 	poolConfig, err := pgxpool.ParseConfig(config.Connection)
 	if err != nil {
 		log.Fatalf("unable to parse conn string: %v", err)
 	}
 
+	config.Logger.DebugContext(cmd.Context(), "create db connection pool")
 	pool, err := pgxpool.NewWithConfig(ctx, poolConfig)
 	if err != nil {
 		log.Fatalf("unable to create database pool: %v", err)
 	}
 
-	es := cockroachdb.New(&cockroachdb.Config{
-		Pool: pool,
-	})
+	server := api.NewServer(ctx, cockroachdb.New(&cockroachdb.Config{Pool: pool}))
 
-	server := api.NewServer(ctx, es)
-
+	config.Logger.DebugContext(cmd.Context(), "start listening")
 	listener, err := net.Listen("tcp", net.JoinHostPort(config.Host, strconv.Itoa(int(config.Port))))
 	if err != nil {
 		log.Fatalf("failed to listen: %v", err)

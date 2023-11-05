@@ -10,10 +10,27 @@ import (
 	"github.com/spf13/pflag"
 )
 
-var pushRequest *eventstorev1alpha.PushRequest
+var (
+	payloadPath string
+	pushRequest *eventstorev1alpha.PushRequest
+)
 
 func parsePushRequest(cmd *cobra.Command, args []string) {
+	cmd.DisableFlagParsing = false
+	if err := cmd.ParseFlags(args); err != nil {
+		config.Logger.Error("failed to parse flags", "cause", err)
+		os.Exit(1)
+	}
+
 	pushRequest = new(eventstorev1alpha.PushRequest)
+
+	if len(payloadPath) > 0 {
+		if err := readPayloadFromFlags(pushRequest); err != nil {
+			config.Logger.Error("failed to read request from path", "path", payloadPath, "cause", err)
+			os.Exit(1)
+		}
+		return
+	}
 
 	aggregatesIndexes := listArgIndexes("aggregates", args...)
 
@@ -23,15 +40,20 @@ func parsePushRequest(cmd *cobra.Command, args []string) {
 			config.Logger.Error("unable to parse aggregate", "index", i, "cause", err)
 			os.Exit(1)
 		}
-		pushRequest.Aggregates = append(pushRequest.Aggregates, aggregate)
+		if aggregate != nil {
+			pushRequest.Aggregates = append(pushRequest.Aggregates, aggregate)
+		}
 	}
 
+	// parse last aggregate
 	aggregate, err := parseAggregate(args[aggregatesIndexes[len(aggregatesIndexes)-1]+1:])
 	if err != nil {
 		config.Logger.Error("unable to parse last aggregate", "cause", err)
 		os.Exit(1)
 	}
-	pushRequest.Aggregates = append(pushRequest.Aggregates, aggregate)
+	if aggregate != nil {
+		pushRequest.Aggregates = append(pushRequest.Aggregates, aggregate)
+	}
 }
 
 func parseAggregate(args []string) (aggregate *eventstorev1alpha.Aggregate, err error) {
@@ -62,6 +84,7 @@ func parseAggregate(args []string) (aggregate *eventstorev1alpha.Aggregate, err 
 		aggregate.Commands = append(aggregate.Commands, command)
 	}
 
+	// parse last command
 	command, err := parseCommand(args[commandsIndexes[len(commandsIndexes)-1]+1:])
 	if err != nil {
 		return nil, err
@@ -70,35 +93,6 @@ func parseAggregate(args []string) (aggregate *eventstorev1alpha.Aggregate, err 
 
 	return aggregate, nil
 }
-
-// func parseList[T any](name string, args []string, flagSet *pflag.FlagSet, parse func(args []string) (*T, error)) (objects []*T, err error) {
-// 	commandsIndexes := listArgIndexes(name, args...)
-// 	if len(commandsIndexes) == 0 {
-// 		config.Logger.Info("skipping because flag not defined in args", "flag", name)
-// 		return nil, nil
-// 	}
-
-// 	if err = flagSet.Parse(args[:commandsIndexes[0]]); err != nil {
-// 		return nil, err
-// 	}
-
-// 	// aggregate.Id = *id
-// 	// aggregate.CurrentSequence = currentSequence
-
-// 	for i := 1; i < len(commandsIndexes); i++ {
-// 		command, err := parseCommand(args[commandsIndexes[i-1]+1 : commandsIndexes[i]])
-// 		if err != nil {
-// 			return nil, err
-// 		}
-// 		aggregate.Commands = append(aggregate.Commands, command)
-// 	}
-
-// 	command, err := parseCommand(args[commandsIndexes[len(commandsIndexes)-1]+1:])
-// 	if err != nil {
-// 		return nil, err
-// 	}
-// 	return nil, nil
-// }
 
 func parseCommand(args []string) (command *eventstorev1alpha.Command, err error) {
 	command = new(eventstorev1alpha.Command)

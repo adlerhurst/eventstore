@@ -42,7 +42,12 @@ func init() {
 }
 
 func connect(cmd *cobra.Command, args []string) {
-	conn, err := grpc.Dial(net.JoinHostPort(config.Host, strconv.Itoa(int(config.Port))), grpc.WithBlock(), grpc.WithTransportCredentials(insecure.NewCredentials()))
+	conn, err := grpc.Dial(
+		net.JoinHostPort(config.Host, strconv.Itoa(int(config.Port))),
+		grpc.WithBlock(),
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+	)
+
 	if err != nil {
 		log.Fatalf("unable to connect to server %v", err)
 	}

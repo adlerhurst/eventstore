@@ -6,23 +6,36 @@ import (
 
 	"github.com/adlerhurst/eventstore/service/internal/api/eventstore/v1alpha"
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 )
 
 var (
 	payloadPath string
 	pushCmd     = &cobra.Command{
-		Use:   "push",
-		Short: "calls the push method",
-		Run:   push,
+		Use:                "push",
+		Short:              "calls the push method",
+		Run:                push,
+		PreRun:             parsePushRequest,
+		DisableFlagParsing: true,
 	}
+	aggregateFlags *pflag.FlagSet
 )
 
 func init() {
 	pushCmd.PersistentFlags().StringVar(&payloadPath, "path", "", "path to the payload of the call")
+	aggregateFlags = pflag.NewFlagSet("aggregate", pflag.ContinueOnError)
+	aggregateFlags.String("id", "", "id of the aggregate")
+	pushCmd.Flags().ParseErrorsWhitelist.UnknownFlags = true
 	_ = pushCmd.MarkFlagFilename("path", ".json")
 }
 
 func push(cmd *cobra.Command, args []string) {
+	err := cmd.ParseFlags(args)
+	if err != nil {
+		config.Logger.Info("failed to parse flags", "cause", err)
+	}
+	err = aggregateFlags.Parse(args)
+	config.Logger.Info("parse", "cause", err)
 	req, err := readPayload(args)
 	if err != nil {
 		config.Logger.Error("failed to read payload", "cause", err)

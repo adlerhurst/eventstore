@@ -34,6 +34,7 @@ func (a *Aggregate) ID() eventstore.TextSubjects {
 func protoToAggregate(aggregate *eventstorev1alpha.Aggregate) eventstore.Aggregate {
 	return &Aggregate{
 		id:       toTextSubjects(aggregate.Id),
+		sequence: aggregate.CurrentSequence,
 		commands: protoToCommands(aggregate.Commands),
 	}
 }

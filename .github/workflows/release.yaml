@@ -2,6 +2,7 @@ on:
   push:
     branches:
       - main
+      - v*
 
 permissions:
   contents: write
@@ -17,3 +18,4 @@ jobs:
         with:
           release-type: go
           package-name: adlerhurst/eventstore
+          default-branch: ${{ github.ref_name }}

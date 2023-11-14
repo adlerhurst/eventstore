@@ -1,0 +1,33 @@
+syntax = "proto3";
+
+package cli.v1alpha;
+
+option go_package = "gen";
+
+import "google/protobuf/descriptor.proto";
+
+// if defined the generated code includes a main
+// function to compile the code with any further interaction
+extend google.protobuf.FileOptions {
+    string cli_name = 50000;
+}
+
+// defines the commands name
+// e.g. ./my-cli user
+// my-cli ${service.command_name}
+extend google.protobuf.ServiceOptions {
+    string command_name = 50000;
+}
+
+// defines the subcommands name
+// e.g. ./my-cli user add
+// my-cli ${service.command_name} ${method.name}
+extend google.protobuf.MethodOptions {
+    string call_name = 50000;
+}
+
+// my-cli ${service.command_name} ${method.name} --${field.arg_name}
+extend google.protobuf.FieldOptions {
+    string arg_name = 50000;
+    bool ignore_fields = 50001;
+}

@@ -32,6 +32,12 @@ var (
 		PersistentPreRun: connect,
 	}
 
+	dialOpts = []grpc.DialOption{
+		grpc.WithBlock(),
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+	}
+	target = net.JoinHostPort(config.Host, strconv.Itoa(int(config.Port)))
+
 	client eventstorev1alpha.EventStoreServiceClient
 )
 
@@ -43,9 +49,8 @@ func init() {
 
 func connect(cmd *cobra.Command, args []string) {
 	conn, err := grpc.Dial(
-		net.JoinHostPort(config.Host, strconv.Itoa(int(config.Port))),
-		grpc.WithBlock(),
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		target,
+		dialOpts...,
 	)
 
 	if err != nil {

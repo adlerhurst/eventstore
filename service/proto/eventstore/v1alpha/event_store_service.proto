@@ -3,9 +3,14 @@ syntax = "proto3";
 package eventstore.v1alpha;
 
 import "google/protobuf/timestamp.proto";
+
 import "eventstore/v1alpha/event.proto";
 
+import "adlerhurst/cli/v1alpha/cli.proto";
+
 service EventStoreService {
+  option (cli.v1alpha.command_name) = "client";
+
   rpc Push(PushRequest) returns (PushResponse);
   rpc Filter(FilterRequest) returns (stream FilterResponse);
 }
@@ -27,8 +32,8 @@ message Query {
     uint32 to = 2;
   }
   message CreatedAt {
-    google.protobuf.Timestamp from = 1;
-    google.protobuf.Timestamp to = 2;
+    google.protobuf.Timestamp from = 1 [(cli.v1alpha.ignore_fields) = true];
+    google.protobuf.Timestamp to = 2 [(cli.v1alpha.ignore_fields) = true];
   }
 
   repeated eventstore.v1alpha.Subject subjects = 1;

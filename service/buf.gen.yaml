@@ -10,6 +10,9 @@ plugins:
   - plugin: go-grpc
     out: internal/api
     opt: paths=source_relative
+  - plugin: go-cli
+    out: internal/api
+    opt: paths=source_relative
   # - plugin: grpc-gateway
   #   out: internal/api
   # - plugin: openapiv2

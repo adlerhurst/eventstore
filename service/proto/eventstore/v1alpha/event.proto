@@ -5,8 +5,12 @@ package eventstore.v1alpha;
 import "google/protobuf/struct.proto";
 import "google/protobuf/timestamp.proto";
 
+import "adlerhurst/cli/v1alpha/cli.proto";
+
 message Event {
+  // unique identifier of the event
   string id = 1;
+  
   Action action = 2;
   uint32 sequence = 3;
   google.protobuf.Timestamp created_at = 4;
@@ -25,7 +29,7 @@ message Command {
 message Action {
   repeated string action = 1;
   uint32 revision = 2;
-  optional google.protobuf.Struct payload = 3;
+  optional google.protobuf.Struct payload = 3 [(cli.v1alpha.ignore_fields) = true];
 }
 
 message Subject {

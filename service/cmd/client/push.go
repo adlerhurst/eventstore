@@ -26,7 +26,6 @@ func init() {
 		config.Logger.Error("failed to mark flag filename", "cause", err)
 		os.Exit(1)
 	}
-	pushCmd.Flags()
 }
 
 func push(cmd *cobra.Command, args []string) {

@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.2](https://github.com/adlerhurst/eventstore/compare/v1.0.1...v1.0.2) (2023-11-14)
+
+
+### Bug Fixes
+
+* typo ([#14](https://github.com/adlerhurst/eventstore/issues/14)) ([8d62e61](https://github.com/adlerhurst/eventstore/commit/8d62e61affa3c794bee2d6cee7c51f951df742ff))
+
 ## [1.0.1](https://github.com/adlerhurst/eventstore/compare/v1.0.0...v1.0.1) (2023-11-01)
 
 

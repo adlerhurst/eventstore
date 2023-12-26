@@ -80,7 +80,7 @@ func filterTx(ctx context.Context, reducer eventstore.Reducer, builder *strings.
 var (
 	filterColumnSelector = "SELECT e.aggregate, e.revision, e.payload, e.sequence, e.created_at, e.action FROM eventstore.events e "
 	filterLimit          = " LIMIT $"
-	filterIgnoreOpenPush = `e.created_at < (SELECT COALESCE(MIN(start), NOW())::TIMESTAMPTZ FROM crdb_internal.cluster_transactions where application_name = $`
+	filterIgnoreOpenPush = `e.created_at < (SELECT COALESCE(MIN(start), NOW())::TIMESTAMPTZ FROM crdb_internal.cluster_transactions WHERE application_name = $`
 )
 
 func (store *CockroachDB) prepareStatement(filter *eventstore.Filter) (builder *strings.Builder, args []any) {
@@ -89,7 +89,7 @@ func (store *CockroachDB) prepareStatement(filter *eventstore.Filter) (builder *
 
 	builder.WriteString(filterColumnSelector)
 
-	builder.WriteString(" WHERE ")
+	builder.WriteString("WHERE ")
 	if len(filter.Queries) > 0 {
 		args = queriesToClause(builder, &index, filter.Queries)
 	}

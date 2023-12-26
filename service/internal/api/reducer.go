@@ -1,6 +1,8 @@
 package api
 
 import (
+	"strconv"
+
 	eventstorev1alpha "github.com/adlerhurst/eventstore/service/internal/api/eventstore/v1alpha"
 	"github.com/adlerhurst/eventstore/v2"
 	"google.golang.org/protobuf/types/known/structpb"
@@ -26,7 +28,7 @@ func (r *StreamReducer) Reduce(events ...eventstore.Event) error {
 
 func eventToProto(event eventstore.Event) (*eventstorev1alpha.Event, error) {
 	e := &eventstorev1alpha.Event{
-		Id: "TODO",
+		Id: event.Aggregate().Join(".") + "." + strconv.Itoa(int(event.Sequence())),
 		Action: &eventstorev1alpha.Action{
 			Action:   actionToProto(event.Action()),
 			Revision: uint32(event.Revision()),

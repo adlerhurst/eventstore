@@ -46,13 +46,14 @@ func init() {
 func run(cmd *cobra.Command, args []string) {
 	ctx, cancel := context.WithCancel(cmd.Context())
 	defer cancel()
-	config.Logger.DebugContext(cmd.Context(), "parse db connection")
+
+	config.Logger.DebugContext(ctx, "parse db connection")
 	poolConfig, err := pgxpool.ParseConfig(config.Connection)
 	if err != nil {
 		log.Fatalf("unable to parse conn string: %v", err)
 	}
 
-	config.Logger.DebugContext(cmd.Context(), "create db connection pool")
+	config.Logger.DebugContext(ctx, "create db connection pool")
 	pool, err := pgxpool.NewWithConfig(ctx, poolConfig)
 	if err != nil {
 		log.Fatalf("unable to create database pool: %v", err)
@@ -60,7 +61,7 @@ func run(cmd *cobra.Command, args []string) {
 
 	server := api.NewServer(ctx, cockroachdb.New(&cockroachdb.Config{Pool: pool}))
 
-	config.Logger.DebugContext(cmd.Context(), "start listening")
+	config.Logger.DebugContext(ctx, "start listening")
 	listener, err := net.Listen("tcp", net.JoinHostPort(config.Host, strconv.Itoa(int(config.Port))))
 	if err != nil {
 		log.Fatalf("failed to listen: %v", err)

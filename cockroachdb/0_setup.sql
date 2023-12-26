@@ -14,8 +14,7 @@ CREATE TABLE IF NOT EXISTS eventstore.events (
     , action TEXT[] NOT NULL
     , action_depth INT2 AS (array_length(action, 1)) STORED
 
-    , PRIMARY KEY (id)
-    , UNIQUE ("aggregate", "sequence")
+    , PRIMARY KEY ("aggregate", "sequence")
 );
 
 CREATE TABLE IF NOT EXISTS eventstore.actions (

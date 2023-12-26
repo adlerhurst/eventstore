@@ -55,15 +55,15 @@ func (store *CockroachDB) Push(ctx context.Context, aggregates ...eventstore.Agg
 }
 
 var (
-	currentSequencesPrefix = []byte(`SELECT "sequence", "aggregate" FROM eventstore.events WHERE ("sequence", "aggregate") IN (SELECT (max("sequence"), "aggregate") FROM eventstore.events WHERE `)
-	currentSequencesSuffix = []byte(` GROUP BY "aggregate") FOR UPDATE`)
+	currentSequencesPrefix = `SELECT "sequence", "aggregate" FROM eventstore.events WHERE ("sequence", "aggregate") IN (SELECT (max("sequence"), "aggregate") FROM eventstore.events WHERE `
+	currentSequencesSuffix = ` GROUP BY "aggregate") FOR UPDATE`
 )
 
 func currentSequences(ctx context.Context, tx pgx.Tx, indexes *aggregateIndexes) (err error) {
 	var builder strings.Builder
-	builder.Write(currentSequencesPrefix)
+	builder.WriteString(currentSequencesPrefix)
 	indexes.currentSequencesClauses(&builder)
-	builder.Write(currentSequencesSuffix)
+	builder.WriteString(currentSequencesSuffix)
 
 	rows, err := tx.Query(ctx, builder.String(), indexes.toAggregateArgs()...)
 	if err != nil {
@@ -99,17 +99,17 @@ func currentSequences(ctx context.Context, tx pgx.Tx, indexes *aggregateIndexes)
 }
 
 var (
-	pushEventsPrefix = []byte(`WITH computed AS (SELECT hlc_to_timestamp(cluster_logical_timestamp()) created_at, cluster_logical_timestamp() "position"), input ("aggregate", "action", revision, payload, "sequence", in_tx_order) AS (VALUES `)
-	pushEventsSuffix = []byte(`) INSERT INTO eventstore.events (created_at, "position", "aggregate", "action", revision, payload, "sequence", in_tx_order) SELECT c.created_at, c."position", i."aggregate", i."action", i.revision, i.payload, i."sequence", i.in_tx_order FROM input i, computed c RETURNING id, created_at`)
+	pushEventsPrefix = `WITH computed AS (SELECT hlc_to_timestamp(cluster_logical_timestamp()) created_at, cluster_logical_timestamp() "position"), input ("aggregate", "action", revision, payload, "sequence", in_tx_order) AS (VALUES `
+	pushEventsSuffix = `) INSERT INTO eventstore.events (created_at, "position", "aggregate", "action", revision, payload, "sequence", in_tx_order) SELECT c.created_at, c."position", i."aggregate", i."action", i.revision, i.payload, i."sequence", i.in_tx_order FROM input i, computed c RETURNING id, created_at`
 
-	pushActionsPrefix = []byte(`INSERT INTO eventstore.actions ("event", "action", depth) VALUES `)
+	pushActionsPrefix = `INSERT INTO eventstore.actions ("event", "action", depth) VALUES `
 )
 
 func push(ctx context.Context, tx pgx.Tx, indexes *aggregateIndexes, commands []*command) (err error) {
 	var pushBuilder strings.Builder
-	pushBuilder.Write(pushEventsPrefix)
+	pushBuilder.WriteString(pushEventsPrefix)
 	eventsArgs := indexes.eventValues(commands, &pushBuilder)
-	pushBuilder.Write(pushEventsSuffix)
+	pushBuilder.WriteString(pushEventsSuffix)
 
 	rows, err := tx.Query(ctx, pushBuilder.String(), eventsArgs...)
 	if err != nil {
@@ -135,7 +135,7 @@ func push(ctx context.Context, tx pgx.Tx, indexes *aggregateIndexes, commands []
 	}
 
 	var actionBuilder strings.Builder
-	actionBuilder.Write(pushActionsPrefix)
+	actionBuilder.WriteString(pushActionsPrefix)
 	actionsArgs := actionValues(commands, &actionBuilder)
 
 	_, err = tx.Exec(ctx, actionBuilder.String(), actionsArgs...)
@@ -211,25 +211,25 @@ func (indexes *aggregateIndexes) toAggregateArgs() []any {
 }
 
 var (
-	or = []byte(" OR ")
+	or = " OR "
 )
 
 func (indexes *aggregateIndexes) currentSequencesClauses(builder *strings.Builder) {
 	for i := range indexes.aggregates {
-		builder.Write([]byte(`"aggregate" = $` + strconv.Itoa(i+1)))
+		builder.WriteString(`"aggregate" = $` + strconv.Itoa(i+1))
 		if i+1 < len(indexes.aggregates) {
-			builder.Write(or)
+			builder.WriteString(or)
 		}
 	}
 }
 
 var (
-	uuidCast      = []byte("::UUID")
-	textCast      = []byte("::TEXT")
-	textArrayCast = []byte("::TEXT[]")
-	smallIntCast  = []byte("::INT2")
-	intCast       = []byte("::INT4")
-	jsonbCast     = []byte("::JSONB")
+	uuidCast      = "::UUID"
+	textCast      = "::TEXT"
+	textArrayCast = "::TEXT[]"
+	smallIntCast  = "::INT2"
+	intCast       = "::INT4"
+	jsonbCast     = "::JSONB"
 )
 
 func (indexes *aggregateIndexes) eventValues(commands []*command, builder *strings.Builder) []any {
@@ -242,33 +242,33 @@ func (indexes *aggregateIndexes) eventValues(commands []*command, builder *strin
 		builder.WriteRune('(')
 
 		builder.WriteRune('$')
-		builder.Write([]byte(strconv.Itoa(index + 1)))
-		builder.Write(textArrayCast)
+		builder.WriteString(strconv.Itoa(index + 1))
+		builder.WriteString(textArrayCast)
 		builder.WriteRune(',')
 
 		builder.WriteRune('$')
-		builder.Write([]byte(strconv.Itoa(index + 2)))
-		builder.Write(textArrayCast)
+		builder.WriteString(strconv.Itoa(index + 2))
+		builder.WriteString(textArrayCast)
 		builder.WriteRune(',')
 
 		builder.WriteRune('$')
-		builder.Write([]byte(strconv.Itoa(index + 3)))
-		builder.Write(smallIntCast)
+		builder.WriteString(strconv.Itoa(index + 3))
+		builder.WriteString(smallIntCast)
 		builder.WriteRune(',')
 
 		builder.WriteRune('$')
-		builder.Write([]byte(strconv.Itoa(index + 4)))
-		builder.Write(jsonbCast)
+		builder.WriteString(strconv.Itoa(index + 4))
+		builder.WriteString(jsonbCast)
 		builder.WriteRune(',')
 
 		builder.WriteRune('$')
-		builder.Write([]byte(strconv.Itoa(index + 5)))
-		builder.Write(intCast)
+		builder.WriteString(strconv.Itoa(index + 5))
+		builder.WriteString(intCast)
 		builder.WriteRune(',')
 
 		builder.WriteRune('$')
-		builder.Write([]byte(strconv.Itoa(index + 6)))
-		builder.Write(intCast)
+		builder.WriteString(strconv.Itoa(index + 6))
+		builder.WriteString(intCast)
 
 		builder.WriteRune(')')
 
@@ -302,18 +302,18 @@ func actionValues(commands []*command, builder *strings.Builder) []any {
 			builder.WriteRune('(')
 
 			builder.WriteRune('$')
-			builder.Write([]byte(strconv.Itoa(index + 1)))
-			builder.Write(uuidCast)
+			builder.WriteString(strconv.Itoa(index + 1))
+			builder.WriteString(uuidCast)
 			builder.WriteRune(',')
 
 			builder.WriteRune('$')
-			builder.Write([]byte(strconv.Itoa(index + 2)))
-			builder.Write(textCast)
+			builder.WriteString(strconv.Itoa(index + 2))
+			builder.WriteString(textCast)
 			builder.WriteRune(',')
 
 			builder.WriteRune('$')
-			builder.Write([]byte(strconv.Itoa(index + 3)))
-			builder.Write(smallIntCast)
+			builder.WriteString(strconv.Itoa(index + 3))
+			builder.WriteString(smallIntCast)
 
 			builder.WriteRune(')')
 

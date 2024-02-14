@@ -1,10 +1,15 @@
 module github.com/adlerhurst/eventstore/v2
 
-go 1.21
+go 1.22.0
 
 require github.com/cockroachdb/cockroach-go/v2 v2.3.5
 
-require github.com/kr/text v0.2.0 // indirect
+require (
+	github.com/adlerhurst/cli-client v0.0.0-00010101000000-000000000000 // indirect
+	github.com/kr/text v0.2.0 // indirect
+	github.com/spf13/pflag v1.0.5 // indirect
+	google.golang.org/protobuf v1.32.0 // indirect
+)
 
 require (
 	github.com/gofrs/flock v0.8.1 // indirect
@@ -18,3 +23,5 @@ require (
 	golang.org/x/sys v0.13.0 // indirect
 	golang.org/x/text v0.13.0 // indirect
 )
+
+replace github.com/adlerhurst/cli-client => ../cli-client

@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	eventstorev1alpha "github.com/adlerhurst/eventstore/service/internal/api/eventstore/v1alpha"
+	eventstorev1alpha "github.com/adlerhurst/eventstore/service/api/adlerhurst/eventstore/v1alpha"
 	"google.golang.org/protobuf/types/known/structpb"
 )
 

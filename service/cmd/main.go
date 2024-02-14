@@ -5,8 +5,9 @@ import (
 	"log/slog"
 	"os"
 
-	"github.com/adlerhurst/eventstore/service/cmd/client"
 	"github.com/adlerhurst/eventstore/service/cmd/server"
+
+	"github.com/adlerhurst/eventstore/service/api/adlerhurst/eventstore/v1alpha"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -33,7 +34,8 @@ func init() {
 
 	rootCmd.PersistentFlags().StringVar(&configPath, "config", "", "config file (default is $HOME/.eventstore/config.yaml)")
 	rootCmd.AddCommand(server.Command)
-	rootCmd.AddCommand(client.Command)
+	// rootCmd.AddCommand(client.Command)
+	rootCmd.AddCommand(v1alpha.ClientCmd)
 	rootCmd.Version = version
 }
 

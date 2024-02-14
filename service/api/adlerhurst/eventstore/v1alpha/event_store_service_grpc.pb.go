@@ -2,9 +2,9 @@
 // versions:
 // - protoc-gen-go-grpc v1.3.0
 // - protoc             (unknown)
-// source: eventstore/v1alpha/event_store_service.proto
+// source: adlerhurst/eventstore/v1alpha/event_store_service.proto
 
-package eventstorev1alpha
+package v1alpha
 
 import (
 	context "context"
@@ -19,8 +19,8 @@ import (
 const _ = grpc.SupportPackageIsVersion7
 
 const (
-	EventStoreService_Push_FullMethodName   = "/eventstore.v1alpha.EventStoreService/Push"
-	EventStoreService_Filter_FullMethodName = "/eventstore.v1alpha.EventStoreService/Filter"
+	EventStoreService_Push_FullMethodName   = "/adlerhurst.eventstore.v1alpha.EventStoreService/Push"
+	EventStoreService_Filter_FullMethodName = "/adlerhurst.eventstore.v1alpha.EventStoreService/Filter"
 )
 
 // EventStoreServiceClient is the client API for EventStoreService service.
@@ -155,7 +155,7 @@ func (x *eventStoreServiceFilterServer) Send(m *FilterResponse) error {
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
 var EventStoreService_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "eventstore.v1alpha.EventStoreService",
+	ServiceName: "adlerhurst.eventstore.v1alpha.EventStoreService",
 	HandlerType: (*EventStoreServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
@@ -170,5 +170,5 @@ var EventStoreService_ServiceDesc = grpc.ServiceDesc{
 			ServerStreams: true,
 		},
 	},
-	Metadata: "eventstore/v1alpha/event_store_service.proto",
+	Metadata: "adlerhurst/eventstore/v1alpha/event_store_service.proto",
 }

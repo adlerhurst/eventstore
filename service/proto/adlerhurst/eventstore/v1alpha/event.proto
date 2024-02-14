@@ -1,11 +1,12 @@
 syntax = "proto3";
 
-package eventstore.v1alpha;
+package adlerhurst.eventstore.v1alpha;
 
 import "google/protobuf/struct.proto";
 import "google/protobuf/timestamp.proto";
+// import "adlerhurst/cli/v1alpha/cli.proto";
 
-import "adlerhurst/cli/v1alpha/cli.proto";
+option go_package = "github.com/adlerhurst/eventstore/v1alpha";
 
 message Event {
   // unique identifier of the event
@@ -29,7 +30,7 @@ message Command {
 message Action {
   repeated string action = 1;
   uint32 revision = 2;
-  optional google.protobuf.Struct payload = 3 [(cli.v1alpha.ignore_fields) = true];
+  optional google.protobuf.Struct payload = 3;
 }
 
 message Subject {

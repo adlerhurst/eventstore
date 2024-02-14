@@ -7,8 +7,8 @@ import (
 	"net"
 	"strconv"
 
-	"github.com/adlerhurst/eventstore/service/internal/api"
-	"github.com/adlerhurst/eventstore/service/internal/api/eventstore/v1alpha"
+	"github.com/adlerhurst/eventstore/service/api"
+	eventstorev1alpha "github.com/adlerhurst/eventstore/service/api/adlerhurst/eventstore/v1alpha"
 	"github.com/adlerhurst/eventstore/v2/cockroachdb"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/spf13/cobra"

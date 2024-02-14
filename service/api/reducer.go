@@ -3,7 +3,7 @@ package api
 import (
 	"strconv"
 
-	eventstorev1alpha "github.com/adlerhurst/eventstore/service/internal/api/eventstore/v1alpha"
+	eventstorev1alpha "github.com/adlerhurst/eventstore/service/api/adlerhurst/eventstore/v1alpha"
 	"github.com/adlerhurst/eventstore/v2"
 	"google.golang.org/protobuf/types/known/structpb"
 )

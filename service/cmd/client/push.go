@@ -3,7 +3,7 @@ package client
 import (
 	"os"
 
-	"github.com/adlerhurst/eventstore/service/internal/api/eventstore/v1alpha"
+	eventstorev1alpha "github.com/adlerhurst/eventstore/service/api/adlerhurst/eventstore/v1alpha"
 	"github.com/spf13/cobra"
 	"google.golang.org/protobuf/encoding/protojson"
 )

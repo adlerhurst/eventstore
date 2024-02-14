@@ -6,7 +6,7 @@ import (
 	"net"
 	"strconv"
 
-	"github.com/adlerhurst/eventstore/service/internal/api/eventstore/v1alpha"
+	eventstorev1alpha "github.com/adlerhurst/eventstore/service/api/adlerhurst/eventstore/v1alpha"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"google.golang.org/grpc"

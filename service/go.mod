@@ -1,15 +1,16 @@
 module github.com/adlerhurst/eventstore/service
 
-go 1.21.3
+go 1.22.0
 
 require (
+	github.com/adlerhurst/cli-client v0.0.0-00010101000000-000000000000
 	github.com/adlerhurst/eventstore/v2 v2.0.0
 	github.com/jackc/pgx/v5 v5.4.3
 	github.com/spf13/cobra v1.7.0
 	github.com/spf13/pflag v1.0.5
 	github.com/spf13/viper v1.17.0
 	google.golang.org/grpc v1.59.0
-	google.golang.org/protobuf v1.31.0
+	google.golang.org/protobuf v1.32.0
 )
 
 require (
@@ -42,3 +43,5 @@ require (
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
+
+replace github.com/adlerhurst/cli-client => ../../cli-client

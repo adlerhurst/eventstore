@@ -1,0 +1,18 @@
+{
+  "queries": [
+    {
+      "subjects": [
+        {
+          "text": "user",
+        },
+        {
+          "text": "10"
+          
+        },
+        {
+          "wildcard": "WILDCARD_MULTI_TOKEN"
+        }
+      ]
+    }
+  ]
+}

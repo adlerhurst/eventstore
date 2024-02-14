@@ -10,6 +10,11 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
+var filterTxOptions = pgx.TxOptions{
+	IsoLevel:   pgx.ReadCommitted,
+	AccessMode: pgx.ReadOnly,
+}
+
 // Filter implements [eventstore.Eventstore]
 func (store *CockroachDB) Filter(ctx context.Context, filter *eventstore.Filter, reducer eventstore.Reducer) (err error) {
 	builder, args := store.prepareStatement(filter)
@@ -29,74 +34,64 @@ func (store *CockroachDB) Filter(ctx context.Context, filter *eventstore.Filter,
 		return err
 	}
 
-	tx, err := conn.BeginTx(ctx, pgx.TxOptions{
-		IsoLevel:   pgx.ReadCommitted,
-		AccessMode: pgx.ReadOnly,
-	})
-	if err != nil {
-		logger.ErrorContext(ctx, "create transaction failed", "cause", err)
-		return err
-	}
-	defer func() {
-		// errors are not handled because it's a read-only transaction
-		if err != nil {
-			_ = tx.Rollback(ctx)
-			return
-		}
-		_ = tx.Commit(ctx)
-	}()
+	return pgx.BeginTxFunc(ctx, conn, filterTxOptions, filterTx(ctx, reducer, builder, args))
+}
 
-	rows, err := tx.Query(ctx, builder.String(), args...)
-	if err != nil {
-		logger.ErrorContext(ctx, "filter events failed", "cause", err)
-		return err
-	}
-	defer rows.Close()
-
-	for rows.Next() {
-		event := eventPool.Get()
-		err = rows.Scan(
-			&event.aggregate,
-			&event.revision,
-			&event.payload,
-			&event.sequence,
-			&event.creationDate,
-			&event.action,
-		)
+func filterTx(ctx context.Context, reducer eventstore.Reducer, builder *strings.Builder, args []any) func(tx pgx.Tx) error {
+	return func(tx pgx.Tx) error {
+		rows, err := tx.Query(ctx, builder.String(), args...)
 		if err != nil {
-			logger.ErrorContext(ctx, "scan of events failed", "cause", err)
-			event.payload = nil
-			eventPool.Put(event)
+			logger.ErrorContext(ctx, "filter events failed", "cause", err)
 			return err
 		}
+		defer rows.Close()
 
-		if err = reducer.Reduce(event); err != nil {
-			logger.DebugContext(ctx, "reduce failed", "cause", err)
+		for rows.Next() {
+			event := eventPool.Get()
+			err = rows.Scan(
+				&event.aggregate,
+				&event.revision,
+				&event.payload,
+				&event.sequence,
+				&event.creationDate,
+				&event.action,
+			)
+			if err != nil {
+				logger.ErrorContext(ctx, "scan of events failed", "cause", err)
+				event.payload = nil
+				eventPool.Put(event)
+				return err
+			}
+
+			if err = reducer.Reduce(event); err != nil {
+				logger.DebugContext(ctx, "reduce failed", "cause", err)
+				event.payload = nil
+				eventPool.Put(event)
+				return err
+			}
 			event.payload = nil
 			eventPool.Put(event)
-			return err
 		}
-		event.payload = nil
-		eventPool.Put(event)
-	}
 
-	return nil
+		return rows.Err()
+	}
 }
 
 var (
 	filterColumnSelector = "SELECT e.aggregate, e.revision, e.payload, e.sequence, e.created_at, e.action FROM eventstore.events e "
 	filterLimit          = " LIMIT $"
-	filterIgnoreOpenPush = `e.created_at < (SELECT COALESCE(MIN(start), NOW())::TIMESTAMPTZ FROM crdb_internal.cluster_transactions where application_name = $`
+	filterIgnoreOpenPush = `e.created_at < (SELECT COALESCE(MIN(start), NOW())::TIMESTAMPTZ FROM crdb_internal.cluster_transactions WHERE application_name = $`
 )
 
-func (store *CockroachDB) prepareStatement(filter *eventstore.Filter) (builder strings.Builder, args []any) {
+func (store *CockroachDB) prepareStatement(filter *eventstore.Filter) (builder *strings.Builder, args []any) {
+	builder = new(strings.Builder)
 	var index int
 
 	builder.WriteString(filterColumnSelector)
 
-	builder.WriteString(" WHERE ")
+	builder.WriteString("WHERE ")
 	if len(filter.Queries) > 0 {
-		args = queriesToClause(&builder, &index, filter.Queries)
+		args = queriesToClause(builder, &index, filter.Queries)
 	}
 
 	if len(args) >= 0 {
@@ -111,7 +106,7 @@ func (store *CockroachDB) prepareStatement(filter *eventstore.Filter) (builder s
 	if filter.Limit > 0 {
 		builder.WriteString(filterLimit)
 		index++
-		builder.Write([]byte(strconv.Itoa(index)))
+		builder.WriteString(strconv.Itoa(index))
 		args = append(args, filter.Limit)
 	}
 

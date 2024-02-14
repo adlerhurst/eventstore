@@ -1,0 +1,26 @@
+{
+  "aggregates": [
+    {
+      "id": [
+        "user",
+        "4"
+      ],
+      "commands": [
+        {
+          "action": {
+            "action": [
+              "user",
+              "4",
+              "username",
+              "set"
+            ],
+            "revision": 1,
+            "payload": {
+              "username": "adlerhurst"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

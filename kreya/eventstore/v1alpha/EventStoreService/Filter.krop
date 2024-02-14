@@ -1,0 +1,13 @@
+{
+  "details": {
+    "methodFqn": "eventstore.v1alpha.EventStoreService.Filter"
+  },
+  "requests": [
+    {
+      "location": "Filter-request.json"
+    }
+  ],
+  "operationType": "serverStreaming",
+  "invokerName": "grpc",
+  "importStreamId": "3c7e4001-d47e-4511-a72c-818dbd534e70"
+}
